@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
+use hexx::Hex;
 use shroom_core::{GridPos, GridWorld, Occupant, RegionId, RegionStates, Tile};
 
 pub fn region_tracking_system(
@@ -8,7 +9,7 @@ pub fn region_tracking_system(
     grid: Res<GridWorld>,
     mut region_states: ResMut<RegionStates>,
 ) {
-    let mut player_tiles: HashMap<IVec2, RegionId> = HashMap::default();
+    let mut player_tiles: HashMap<Hex, RegionId> = HashMap::default();
     for (gpos, tile) in tiles.iter() {
         if let Occupant::Player(rid) = tile.occupant {
             player_tiles.insert(gpos.0, rid);
@@ -19,8 +20,8 @@ pub fn region_tracking_system(
         state.tile_count = 0;
     }
 
-    let mut visited: HashSet<IVec2> = HashSet::default();
-    let mut components: Vec<(RegionId, Vec<IVec2>)> = Vec::new();
+    let mut visited: HashSet<Hex> = HashSet::default();
+    let mut components: Vec<(RegionId, Vec<Hex>)> = Vec::new();
 
     for (&pos, &original_rid) in &player_tiles {
         if visited.contains(&pos) {
@@ -99,7 +100,7 @@ mod tests {
         app
     }
 
-    fn spawn_tile(app: &mut App, pos: IVec2, occupant: Occupant) -> Entity {
+    fn spawn_tile(app: &mut App, pos: Hex, occupant: Occupant) -> Entity {
         let entity = app
             .world_mut()
             .spawn((
@@ -125,9 +126,10 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        spawn_tile(&mut app, IVec2::new(0, 0), Occupant::Player(rid));
-        spawn_tile(&mut app, IVec2::new(1, 0), Occupant::Player(rid));
-        spawn_tile(&mut app, IVec2::new(2, 0), Occupant::Player(rid));
+        // Three horizontally adjacent hexes (axial coords: q varies, r=0)
+        spawn_tile(&mut app, Hex::new(0, 0), Occupant::Player(rid));
+        spawn_tile(&mut app, Hex::new(1, 0), Occupant::Player(rid));
+        spawn_tile(&mut app, Hex::new(2, 0), Occupant::Player(rid));
 
         app.add_systems(Update, region_tracking_system);
         app.update();
@@ -145,11 +147,12 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        spawn_tile(&mut app, IVec2::new(0, 0), Occupant::Player(rid));
-        spawn_tile(&mut app, IVec2::new(1, 0), Occupant::Player(rid));
-        spawn_tile(&mut app, IVec2::new(2, 0), Occupant::Empty); // gap
-        spawn_tile(&mut app, IVec2::new(3, 0), Occupant::Player(rid));
-        spawn_tile(&mut app, IVec2::new(4, 0), Occupant::Player(rid));
+        // Two clusters separated by a gap (non-adjacent in hex space)
+        spawn_tile(&mut app, Hex::new(0, 0), Occupant::Player(rid));
+        spawn_tile(&mut app, Hex::new(1, 0), Occupant::Player(rid));
+        spawn_tile(&mut app, Hex::new(2, 0), Occupant::Empty); // gap
+        spawn_tile(&mut app, Hex::new(3, 0), Occupant::Player(rid));
+        spawn_tile(&mut app, Hex::new(4, 0), Occupant::Player(rid));
 
         app.add_systems(Update, region_tracking_system);
         app.update();

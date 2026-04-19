@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use hexx::{Hex, HexOrientation, OffsetHexMode};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 use shroom_core::{
@@ -9,6 +10,12 @@ use shroom_core::{
 
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 60;
+
+/// Converts offset grid coordinates (col, row) to axial hex coordinates.
+/// Uses pointy-top orientation with odd-row offset, matching the project's hex layout.
+fn offset_to_hex(col: i32, row: i32) -> Hex {
+    Hex::from_offset_coordinates([col, row], OffsetHexMode::Odd, HexOrientation::Pointy)
+}
 
 #[derive(Resource)]
 pub struct TerrainSeed(pub u64);
@@ -32,7 +39,7 @@ pub fn terrain_generation(
 
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
-            let pos = IVec2::new(x, y);
+            let hex = offset_to_hex(x, y);
             let depth_ratio = 1.0 - (y as f32 / MAP_HEIGHT as f32);
 
             let terrain = if y == MAP_HEIGHT - 1 {
@@ -56,7 +63,7 @@ pub fn terrain_generation(
 
             let entity = commands
                 .spawn((
-                    GridPos(pos),
+                    GridPos(hex),
                     Tile {
                         terrain,
                         nutrient_level,
@@ -65,7 +72,7 @@ pub fn terrain_generation(
                     },
                 ))
                 .id();
-            grid.tiles.insert(pos, entity);
+            grid.tiles.insert(hex, entity);
         }
     }
 
@@ -123,7 +130,7 @@ pub fn terrain_generation(
     for i in 0..plant_count {
         let x = rng.random_range(0..MAP_WIDTH);
         let y = rng.random_range(MAP_HEIGHT / 2..MAP_HEIGHT - 1);
-        let pos = IVec2::new(x, y);
+        let pos = offset_to_hex(x, y);
         if let Some(&entity) = grid.tiles.get(&pos) {
             commands.entity(entity).insert(Tile {
                 terrain: TerrainType::Root,
@@ -162,72 +169,62 @@ pub fn terrain_generation(
         state.nutrients = 100.0;
         state.energy = 20.0;
     }
-    let player_start = IVec2::new(MAP_WIDTH / 2, MAP_HEIGHT / 2);
-    for dx in -2..=2 {
-        for dy in -2..=2 {
-            let pos = player_start + IVec2::new(dx, dy);
-            if let Some(&entity) = grid.tiles.get(&pos) {
-                commands.entity(entity).insert(Tile {
-                    terrain: TerrainType::Soil,
-                    occupant: Occupant::Player(player_rid),
-                    nutrient_level: 0.8,
-                    moisture: 0.5,
-                    discovered: true,
-                    contents: None,
-                    biomass: 1.0,
-                    nutrient_gradient: Vec2::ZERO,
-                    priority_bias: Vec2::ZERO,
-                });
-            }
+    let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+    for hex in player_start.range(2) {
+        if let Some(&entity) = grid.tiles.get(&hex) {
+            commands.entity(entity).insert(Tile {
+                terrain: TerrainType::Soil,
+                occupant: Occupant::Player(player_rid),
+                nutrient_level: 0.8,
+                moisture: 0.5,
+                discovered: true,
+                contents: None,
+                biomass: 1.0,
+                nutrient_gradient: Vec2::ZERO,
+                priority_bias: Vec2::ZERO,
+            });
         }
     }
-    // Spawn initial hyphal tips at the edges of the starting cluster
-    for &offset in &[
-        IVec2::new(-2, 0),
-        IVec2::new(2, 0),
-        IVec2::new(0, -2),
-        IVec2::new(0, 2),
-    ] {
-        let tip_pos = player_start + offset;
-        commands.spawn((
-            GridPos(tip_pos),
-            HyphalTip {
-                region_id: player_rid,
-                age: 0,
-            },
-        ));
+    // Spawn initial hyphal tips at the neighbor ring around the starting hex
+    for neighbor in player_start.all_neighbors() {
+        if grid.tiles.contains_key(&neighbor) {
+            commands.spawn((
+                GridPos(neighbor),
+                HyphalTip {
+                    region_id: player_rid,
+                    age: 0,
+                },
+            ));
+        }
     }
 
     // Spawn rival in the opposite corner
     let rival_id = RivalId(0);
-    let rival_start = IVec2::new(MAP_WIDTH / 4, MAP_HEIGHT / 4);
-    for dx in -1..=1 {
-        for dy in -1..=1 {
-            let pos = rival_start + IVec2::new(dx, dy);
-            if let Some(&entity) = grid.tiles.get(&pos) {
-                commands.entity(entity).insert(Tile {
-                    terrain: TerrainType::Soil,
-                    occupant: Occupant::Rival(rival_id),
-                    nutrient_level: 0.5,
-                    moisture: 0.5,
-                    discovered: false,
-                    contents: None,
-                    biomass: 1.5,
-                    nutrient_gradient: Vec2::ZERO,
-                    priority_bias: Vec2::ZERO,
-                });
-            }
+    let rival_start = offset_to_hex(MAP_WIDTH / 4, MAP_HEIGHT / 4);
+    for hex in rival_start.range(1) {
+        if let Some(&entity) = grid.tiles.get(&hex) {
+            commands.entity(entity).insert(Tile {
+                terrain: TerrainType::Soil,
+                occupant: Occupant::Rival(rival_id),
+                nutrient_level: 0.5,
+                moisture: 0.5,
+                discovered: false,
+                contents: None,
+                biomass: 1.5,
+                nutrient_gradient: Vec2::ZERO,
+                priority_bias: Vec2::ZERO,
+            });
         }
     }
 }
 
-fn random_soil_pos(grid: &GridWorld, rng: &mut StdRng) -> IVec2 {
+fn random_soil_pos(grid: &GridWorld, rng: &mut StdRng) -> Hex {
     let w = grid.width;
     let h = grid.height;
     loop {
-        let pos = IVec2::new(rng.random_range(1..w - 1), rng.random_range(1..h - 2));
-        if grid.tiles.contains_key(&pos) {
-            return pos;
+        let hex = offset_to_hex(rng.random_range(1..w - 1), rng.random_range(1..h - 2));
+        if grid.tiles.contains_key(&hex) {
+            return hex;
         }
     }
 }
@@ -267,7 +264,8 @@ mod tests {
 
         let grid = app.world().resource::<GridWorld>();
         for x in 0..MAP_WIDTH {
-            let entity = grid.tiles[&IVec2::new(x, MAP_HEIGHT - 1)];
+            let hex = offset_to_hex(x, MAP_HEIGHT - 1);
+            let entity = grid.tiles[&hex];
             let tile = app.world().get::<Tile>(entity).unwrap();
             assert_eq!(tile.terrain, TerrainType::Surface);
         }
@@ -295,14 +293,10 @@ mod tests {
         app.update();
 
         let grid = app.world().resource::<GridWorld>();
-        let surface_tile = app
-            .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(0, MAP_HEIGHT - 2)])
-            .unwrap();
-        let deep_tile = app
-            .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(0, 0)])
-            .unwrap();
+        let near_surface = offset_to_hex(0, MAP_HEIGHT - 2);
+        let deep = offset_to_hex(0, 0);
+        let surface_tile = app.world().get::<Tile>(grid.tiles[&near_surface]).unwrap();
+        let deep_tile = app.world().get::<Tile>(grid.tiles[&deep]).unwrap();
         assert!(surface_tile.moisture > deep_tile.moisture);
     }
 }
