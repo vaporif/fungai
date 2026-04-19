@@ -102,12 +102,20 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
         color = color + vec3<f32>(strength, -0.02, -0.02);
     }
 
-    // Fog of war: smooth gradient from discovered to hidden
-    let disc = material.discovered;
+    // Fog of war: noise-dithered two-stage reveal
+    var disc = material.discovered;
     if disc < 1.0 {
+        // Noise dithering to scatter the boundary into a dissolve pattern
+        disc = disc + (noise2d(world_uv * 6.0) - 0.5) * 0.25;
+        disc = clamp(disc, 0.0, 1.0);
+
         let gray = dot(color, vec3<f32>(0.299, 0.587, 0.114));
-        let desat = mix(vec3<f32>(gray), color, 0.3);
-        color = mix(desat * 0.25, color, smoothstep(0.0, 1.0, disc));
+        let desat = vec3<f32>(gray);
+
+        // Stage 1: black to dim desaturated (disc 0.0 to 0.4)
+        let dim = mix(vec3<f32>(0.0), desat * 0.35, smoothstep(0.0, 0.4, disc));
+        // Stage 2: dim to full color (disc 0.4 to 1.0)
+        color = mix(dim, color, smoothstep(0.4, 1.0, disc));
     }
 
     return vec4<f32>(color, 1.0);
