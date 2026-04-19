@@ -21,6 +21,8 @@ impl Plugin for UiPlugin {
                     update_ability_bar,
                     slot_machine_ui_system,
                     slot_machine_selection_system,
+                    ability_click_system,
+                    spore_button_system,
                 ),
             );
     }

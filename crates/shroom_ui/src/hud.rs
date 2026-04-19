@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use shroom_core::{GameState, RegionStates};
+use shroom_input::SelectedRegion;
 
 #[derive(Component)]
 pub struct HudRoot;
@@ -35,7 +36,7 @@ pub fn spawn_hud(mut commands: Commands) {
             ));
             parent.spawn((
                 HudRegionText,
-                Text::new("No region selected"),
+                Text::new("Click a tile to inspect."),
                 TextFont {
                     font_size: 14.0,
                     ..default()
@@ -48,6 +49,7 @@ pub fn spawn_hud(mut commands: Commands) {
 pub fn update_hud(
     game_state: Res<GameState>,
     region_states: Res<RegionStates>,
+    selected: Res<SelectedRegion>,
     mut turn_text: Query<&mut Text, With<HudTurnText>>,
     mut region_text: Query<&mut Text, (With<HudRegionText>, Without<HudTurnText>)>,
 ) {
@@ -63,15 +65,22 @@ pub fn update_hud(
     }
 
     if let Ok(mut text) = region_text.single_mut() {
-        if let Some((_rid, state)) = region_states.regions.iter().next() {
-            let spec_name = state
-                .specialization
-                .map(|s| format!("{s:?}"))
-                .unwrap_or_else(|| "Unspecialized".into());
-            **text = format!(
-                "{} | N:{:.0} E:{:.0} B:{:.0} | Tiles:{}",
-                spec_name, state.nutrients, state.energy, state.biomass, state.tile_count
-            );
+        let state = selected.region_id.and_then(|rid| region_states.get(rid));
+
+        match state {
+            Some(state) => {
+                let spec_name = state
+                    .specialization
+                    .map(|s| format!("{s:?}"))
+                    .unwrap_or_else(|| "Unspecialized".into());
+                **text = format!(
+                    "{} | N:{:.0} E:{:.0} B:{:.0} | Tiles:{}",
+                    spec_name, state.nutrients, state.energy, state.biomass, state.tile_count
+                );
+            }
+            None => {
+                **text = "Click a tile to inspect.".into();
+            }
         }
     }
 }
