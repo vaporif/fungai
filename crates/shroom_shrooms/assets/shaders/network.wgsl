@@ -16,7 +16,7 @@ fn hash21(p: vec2<f32>) -> f32 {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-fn noise1d(p: vec2<f32>) -> f32 {
+fn noise2d(p: vec2<f32>) -> f32 {
     let i = floor(p);
     let f = fract(p);
     let u = f * f * (3.0 - 2.0 * f);
@@ -30,41 +30,42 @@ fn noise1d(p: vec2<f32>) -> f32 {
 @fragment
 fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     let uv = mesh.uv;
-    let u = uv.x;
-    let v = uv.y;
-    let abs_u = abs(u);
+    let center = vec2<f32>(0.5, 0.5);
+    let dist = distance(uv, center) * 2.0;
 
-    let glow_intensity = clamp(material.biomass * 0.2, 0.1, 1.0);
+    // Noise-distorted edge for organic shape
+    let edge_noise = noise2d(uv * 8.0 + material.time * 0.1) * 0.15;
+    let fine_noise = noise2d(uv * 20.0) * 0.08;
+    let distorted_dist = dist + edge_noise + fine_noise;
 
-    // Layer 1: Core — bright tight spine
-    let core_width = 0.15;
-    let core = smoothstep(core_width, core_width * 0.3, abs_u);
-    let core_color = material.core_color.rgb * (1.2 + glow_intensity * 0.8);
-
-    // Layer 2: Fibrous body with value noise texture
-    let body_width = 0.55;
-    let body = smoothstep(body_width, body_width * 0.5, abs_u);
-    let fiber = noise1d(vec2<f32>(u * 3.0, v * 20.0 + material.time * 0.5));
-    let body_color = material.body_color.rgb * (0.5 + fiber * 0.3);
-
-    // Layer 3: Soft glow falloff to edge
-    let glow_edge = 1.0;
-    let glow = smoothstep(glow_edge, 0.3, abs_u) * glow_intensity;
-    let glow_color = material.core_color.rgb * 0.3;
-
-    // Composite layers back-to-front
-    var color = glow_color * glow;
-    let alpha = glow * 0.3;
-    color = mix(color, body_color, body * 0.8);
-    color = mix(color, core_color, core);
-
-    // Low-biomass flicker — network looks starved/unstable
-    if material.biomass < 1.5 {
-        let flicker = sin(material.time * 8.0 + v * 12.0) * 0.5 + 0.5;
-        let flicker_strength = (1.5 - material.biomass) / 1.5 * 0.4;
-        color = color * (1.0 - flicker_strength * flicker);
+    // Soft radial falloff — discard fully transparent pixels
+    let outer_edge = smoothstep(1.0, 0.65, distorted_dist);
+    if outer_edge < 0.01 {
+        discard;
     }
 
-    let final_alpha = max(max(core * 0.95, body * 0.7), alpha);
-    return vec4<f32>(color, final_alpha);
+    let glow = clamp(material.biomass * 0.15, 0.05, 0.8);
+
+    // Internal fibrous texture
+    let fiber1 = noise2d(uv * 12.0 + vec2<f32>(material.time * 0.05, 0.0));
+    let fiber2 = noise2d(uv * 25.0 + vec2<f32>(0.0, material.time * 0.03));
+    let fibers = fiber1 * 0.6 + fiber2 * 0.4;
+
+    // Core glow at center
+    let core_strength = smoothstep(0.5, 0.0, distorted_dist) * glow;
+
+    // Compose layers
+    var color = material.body_color.rgb * (0.3 + fibers * 0.4);
+    color = mix(color, material.core_color.rgb, core_strength);
+
+    // Edge glow ring
+    let edge_glow = smoothstep(0.9, 0.6, distorted_dist) * smoothstep(0.4, 0.7, distorted_dist);
+    color = color + material.core_color.rgb * edge_glow * glow * 0.5;
+
+    // Pulsing veins
+    let vein = smoothstep(0.48, 0.5, noise2d(uv * 15.0 + material.time * 0.08));
+    color = color + material.core_color.rgb * vein * 0.15 * glow;
+
+    let alpha = outer_edge * (0.5 + core_strength * 0.5);
+    return vec4<f32>(color, alpha);
 }

@@ -226,6 +226,11 @@ fn count_node_edges(graph: &BranchGraph) -> std::collections::HashMap<IVec2, usi
     counts
 }
 
+/// Blob radius for a network node based on biomass.
+fn blob_radius(biomass: f32) -> f32 {
+    TILE_SIZE * 0.55 + biomass.clamp(0.0, 5.0) * 2.0
+}
+
 pub fn network_render_system(
     mut commands: Commands,
     graph: Res<BranchGraph>,
@@ -238,7 +243,6 @@ pub fn network_render_system(
     mut net_materials: ResMut<Assets<NetworkMaterial>>,
     time: Res<Time>,
 ) {
-    // Despawn all previous visuals
     for entity in existing_meshes.iter() {
         commands.entity(entity).despawn();
     }
@@ -251,140 +255,63 @@ pub fn network_render_system(
 
     let elapsed = time.elapsed_secs();
 
-    // Render each edge as multiple wobbled sub-strands
-    for edge in &graph.edges {
-        let from = edge.from.as_vec2() * TILE_SIZE;
-        let to = edge.to.as_vec2() * TILE_SIZE;
-        let total_width = (edge.thickness * 2.0).clamp(2.0, 8.0);
-        let strand_width = total_width / STRANDS_PER_EDGE as f32;
-
-        let spec = graph.nodes.get(&edge.from).and_then(|n| n.specialization);
-        let core = region_color_linear(spec);
+    // Player network: one blob per node — overlapping circles merge into organic mass
+    for (pos, node) in &graph.nodes {
+        let core = region_color_linear(node.specialization);
         let body = body_color_from_core(core);
+        let radius = blob_radius(node.biomass);
+        let world_pos = pos.as_vec2() * TILE_SIZE;
 
-        let base_seed =
-            (edge.from.x.wrapping_mul(73_856_093) ^ edge.to.y.wrapping_mul(19_349_663)) as u32;
-
-        // Perpendicular to edge direction — used to spread strands apart
-        let edge_dir = (to - from).normalize_or_zero();
-        let perp = Vec2::new(-edge_dir.y, edge_dir.x);
-
-        for strand in 0..STRANDS_PER_EDGE {
-            let strand_seed = base_seed.wrapping_add((strand as u32).wrapping_mul(2_654_435_761));
-
-            // Fan strands out from the center line
-            let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
-            let strand_from = from + perp * spread;
-            let strand_to = to + perp * spread;
-
-            let (mesh, _) = build_spline_mesh_with_wobble(
-                strand_from,
-                strand_to,
-                strand_width * 0.5,
-                strand_seed,
-            );
-
-            // Center strand is brighter
-            let strand_biomass = if strand == 0 {
-                edge.thickness
-            } else {
-                edge.thickness * 0.7
-            };
-
-            commands.spawn((
-                NetworkMesh,
-                Mesh2d(meshes.add(mesh)),
-                MeshMaterial2d(net_materials.add(NetworkMaterial {
-                    uniforms: NetworkUniforms {
-                        core_color: core,
-                        body_color: body,
-                        biomass: strand_biomass,
-                        time: elapsed,
-                        _padding: Vec2::ZERO,
-                    },
-                })),
-                Transform::from_translation(Vec3::new(0.0, 0.0, 1.0 + strand as f32 * 0.01)),
-            ));
-        }
+        commands.spawn((
+            NetworkMesh,
+            Mesh2d(meshes.add(Rectangle::new(radius * 2.0, radius * 2.0))),
+            MeshMaterial2d(net_materials.add(NetworkMaterial {
+                uniforms: NetworkUniforms {
+                    core_color: core,
+                    body_color: body,
+                    biomass: node.biomass,
+                    time: elapsed,
+                    _padding: Vec2::ZERO,
+                },
+            })),
+            Transform::from_translation(world_pos.extend(1.0)),
+        ));
     }
 
-    // Junction circles at branching nodes (3+ edges)
-    let edge_counts = count_node_edges(&graph);
-    for (&pos, &count) in &edge_counts {
-        if count >= 3 {
-            let spec = graph.nodes.get(&pos).and_then(|n| n.specialization);
-            let core = region_color_linear(spec);
-            let body = body_color_from_core(core);
-            let biomass = graph.nodes.get(&pos).map_or(1.0, |n| n.biomass);
-            let world_pos = pos.as_vec2() * TILE_SIZE;
-
-            commands.spawn((
-                JunctionMesh,
-                Mesh2d(meshes.add(Circle::new(4.0))),
-                MeshMaterial2d(net_materials.add(NetworkMaterial {
-                    uniforms: NetworkUniforms {
-                        core_color: core,
-                        body_color: body,
-                        biomass,
-                        time: elapsed,
-                        _padding: Vec2::ZERO,
-                    },
-                })),
-                Transform::from_translation(world_pos.extend(1.5)),
-            ));
-        }
-    }
-
-    // Rival network — deep crimson
+    // Rival network: same blob approach, crimson
     let rival_core = LinearRgba::new(0.7, 0.1, 0.1, 1.0);
     let rival_body = LinearRgba::new(0.3, 0.05, 0.05, 0.7);
 
-    for edge in &rival_graph.edges {
-        let from = edge.from.as_vec2() * TILE_SIZE;
-        let to = edge.to.as_vec2() * TILE_SIZE;
-        let total_width = (edge.thickness * 2.0).clamp(2.0, 8.0);
-        let strand_width = total_width / STRANDS_PER_EDGE as f32;
-        let base_seed =
-            (edge.from.x.wrapping_mul(73_856_093) ^ edge.to.y.wrapping_mul(19_349_663)) as u32;
-        let edge_dir = (to - from).normalize_or_zero();
-        let perp = Vec2::new(-edge_dir.y, edge_dir.x);
+    for (pos, node) in &rival_graph.nodes {
+        let radius = blob_radius(node.biomass);
+        let world_pos = pos.as_vec2() * TILE_SIZE;
 
-        for strand in 0..STRANDS_PER_EDGE {
-            let strand_seed = base_seed.wrapping_add((strand as u32).wrapping_mul(2_654_435_761));
-            let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
-            let (mesh, _) = build_spline_mesh_with_wobble(
-                from + perp * spread,
-                to + perp * spread,
-                strand_width * 0.5,
-                strand_seed,
-            );
-
-            commands.spawn((
-                NetworkMesh,
-                Mesh2d(meshes.add(mesh)),
-                MeshMaterial2d(net_materials.add(NetworkMaterial {
-                    uniforms: NetworkUniforms {
-                        core_color: rival_core,
-                        body_color: rival_body,
-                        biomass: edge.thickness * if strand == 0 { 1.0 } else { 0.7 },
-                        time: elapsed,
-                        _padding: Vec2::ZERO,
-                    },
-                })),
-                Transform::from_translation(Vec3::new(0.0, 0.0, 1.0 + strand as f32 * 0.01)),
-            ));
-        }
+        commands.spawn((
+            NetworkMesh,
+            Mesh2d(meshes.add(Rectangle::new(radius * 2.0, radius * 2.0))),
+            MeshMaterial2d(net_materials.add(NetworkMaterial {
+                uniforms: NetworkUniforms {
+                    core_color: rival_core,
+                    body_color: rival_body,
+                    biomass: node.biomass,
+                    time: elapsed,
+                    _padding: Vec2::ZERO,
+                },
+            })),
+            Transform::from_translation(world_pos.extend(1.0)),
+        ));
     }
 
-    // Tip glow circles
+    // Tip glow — pulsing blobs at growth tips
     for (pos, spec) in &tip_positions.tips {
         let core = region_color_linear(*spec);
         let world_pos = pos.as_vec2() * TILE_SIZE;
         let pulse = (elapsed * 3.0).sin() * 0.5 + 0.5;
+        let radius = TILE_SIZE * 0.5 + pulse * 6.0;
 
         commands.spawn((
             NetworkMesh,
-            Mesh2d(meshes.add(Circle::new(8.0 + pulse * 4.0))),
+            Mesh2d(meshes.add(Rectangle::new(radius * 2.0, radius * 2.0))),
             MeshMaterial2d(net_materials.add(NetworkMaterial {
                 uniforms: NetworkUniforms {
                     core_color: core,
@@ -394,7 +321,7 @@ pub fn network_render_system(
                     _padding: Vec2::ZERO,
                 },
             })),
-            Transform::from_translation(world_pos.extend(1.8)),
+            Transform::from_translation(world_pos.extend(1.5)),
         ));
     }
 }
