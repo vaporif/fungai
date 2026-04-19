@@ -90,6 +90,7 @@ pub fn spawn_hud(mut commands: Commands) {
                 "Left click \u{2014} Select tile",
                 "Right drag \u{2014} Set growth priority",
                 "Space \u{2014} Pause  |  +/- Speed",
+                "1-8 \u{2014} Set specialization",
                 "H \u{2014} Hide hints",
             ];
             for hint in hints {
