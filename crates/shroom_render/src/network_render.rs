@@ -11,7 +11,8 @@ use bevy::{
 use crate::data_layer::{BranchGraph, RivalBranchGraph, TipPositions};
 use crate::terrain_render::TILE_SIZE;
 
-const SPLINE_SAMPLES: usize = 8;
+const SPLINE_SAMPLES: usize = 12;
+const STRANDS_PER_EDGE: usize = 3;
 
 #[derive(Component)]
 pub struct NetworkPathSprite;
@@ -153,7 +154,7 @@ fn build_spline_mesh_inner(
     // Apply perpendicular wobble to interior points when a seed is provided
     if let Some(seed) = wobble_seed {
         let branch_len = dir.length();
-        let wobble_scale = (branch_len * 0.03).min(2.0);
+        let wobble_scale = (branch_len * 0.12).min(8.0);
 
         // Precompute tangents before mutating points
         let mut normals: Vec<Vec2> = Vec::with_capacity(SPLINE_SAMPLES);
@@ -250,35 +251,61 @@ pub fn network_render_system(
 
     let elapsed = time.elapsed_secs();
 
-    // Render each edge as a wobbled spline mesh
+    // Render each edge as multiple wobbled sub-strands
     for edge in &graph.edges {
         let from = edge.from.as_vec2() * TILE_SIZE;
         let to = edge.to.as_vec2() * TILE_SIZE;
-        let width = (edge.thickness * 2.0).clamp(2.0, 8.0);
-        let half_width = width * 0.5;
+        let total_width = (edge.thickness * 2.0).clamp(2.0, 8.0);
+        let strand_width = total_width / STRANDS_PER_EDGE as f32;
 
         let spec = graph.nodes.get(&edge.from).and_then(|n| n.specialization);
         let core = region_color_linear(spec);
         let body = body_color_from_core(core);
 
-        let edge_seed =
+        let base_seed =
             (edge.from.x.wrapping_mul(73_856_093) ^ edge.to.y.wrapping_mul(19_349_663)) as u32;
-        let (mesh, _) = build_spline_mesh_with_wobble(from, to, half_width, edge_seed);
 
-        commands.spawn((
-            NetworkMesh,
-            Mesh2d(meshes.add(mesh)),
-            MeshMaterial2d(net_materials.add(NetworkMaterial {
-                uniforms: NetworkUniforms {
-                    core_color: core,
-                    body_color: body,
-                    biomass: edge.thickness,
-                    time: elapsed,
-                    _padding: Vec2::ZERO,
-                },
-            })),
-            Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
-        ));
+        // Perpendicular to edge direction — used to spread strands apart
+        let edge_dir = (to - from).normalize_or_zero();
+        let perp = Vec2::new(-edge_dir.y, edge_dir.x);
+
+        for strand in 0..STRANDS_PER_EDGE {
+            let strand_seed = base_seed.wrapping_add(strand as u32 * 2_654_435_761);
+
+            // Fan strands out from the center line
+            let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
+            let strand_from = from + perp * spread;
+            let strand_to = to + perp * spread;
+
+            let (mesh, _) = build_spline_mesh_with_wobble(
+                strand_from,
+                strand_to,
+                strand_width * 0.5,
+                strand_seed,
+            );
+
+            // Center strand is brighter
+            let strand_biomass = if strand == 0 {
+                edge.thickness
+            } else {
+                edge.thickness * 0.7
+            };
+
+            commands.spawn((
+                NetworkMesh,
+                Mesh2d(meshes.add(mesh)),
+                MeshMaterial2d(net_materials.add(NetworkMaterial {
+                    uniforms: NetworkUniforms {
+                        core_color: core,
+                        body_color: body,
+                        biomass: strand_biomass,
+                        time: elapsed,
+                        _padding: Vec2::ZERO,
+                    },
+                })),
+                Transform::from_translation(Vec3::new(0.0, 0.0, 1.0 + strand as f32 * 0.01)),
+            ));
+        }
     }
 
     // Junction circles at branching nodes (3+ edges)
@@ -315,26 +342,38 @@ pub fn network_render_system(
     for edge in &rival_graph.edges {
         let from = edge.from.as_vec2() * TILE_SIZE;
         let to = edge.to.as_vec2() * TILE_SIZE;
-        let width = (edge.thickness * 2.0).clamp(2.0, 8.0);
-        let half_width = width * 0.5;
-        let edge_seed =
+        let total_width = (edge.thickness * 2.0).clamp(2.0, 8.0);
+        let strand_width = total_width / STRANDS_PER_EDGE as f32;
+        let base_seed =
             (edge.from.x.wrapping_mul(73_856_093) ^ edge.to.y.wrapping_mul(19_349_663)) as u32;
-        let (mesh, _) = build_spline_mesh_with_wobble(from, to, half_width, edge_seed);
+        let edge_dir = (to - from).normalize_or_zero();
+        let perp = Vec2::new(-edge_dir.y, edge_dir.x);
 
-        commands.spawn((
-            NetworkMesh,
-            Mesh2d(meshes.add(mesh)),
-            MeshMaterial2d(net_materials.add(NetworkMaterial {
-                uniforms: NetworkUniforms {
-                    core_color: rival_core,
-                    body_color: rival_body,
-                    biomass: edge.thickness,
-                    time: time.elapsed_secs(),
-                    _padding: Vec2::ZERO,
-                },
-            })),
-            Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
-        ));
+        for strand in 0..STRANDS_PER_EDGE {
+            let strand_seed = base_seed.wrapping_add(strand as u32 * 2_654_435_761);
+            let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
+            let (mesh, _) = build_spline_mesh_with_wobble(
+                from + perp * spread,
+                to + perp * spread,
+                strand_width * 0.5,
+                strand_seed,
+            );
+
+            commands.spawn((
+                NetworkMesh,
+                Mesh2d(meshes.add(mesh)),
+                MeshMaterial2d(net_materials.add(NetworkMaterial {
+                    uniforms: NetworkUniforms {
+                        core_color: rival_core,
+                        body_color: rival_body,
+                        biomass: edge.thickness * if strand == 0 { 1.0 } else { 0.7 },
+                        time: elapsed,
+                        _padding: Vec2::ZERO,
+                    },
+                })),
+                Transform::from_translation(Vec3::new(0.0, 0.0, 1.0 + strand as f32 * 0.01)),
+            ));
+        }
     }
 
     // Tip glow circles
