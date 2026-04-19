@@ -1,12 +1,11 @@
 use bevy::prelude::*;
 use shroom_core::{
-    FaunaAgent, FragmentAgent, FruitingBody, GridPos, MushroomEntity, NeutralFungusAgent,
-    OrganismSpriteLink, PlantRootAgent, SpecializationType,
+    FaunaAgent, FragmentAgent, FruitingBody, GridPos, HexLayout, MushroomEntity,
+    NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent, SpecializationType,
 };
 
 use crate::assets::EntitySprites;
 use crate::data_layer::TipPositions;
-use crate::terrain_render::TILE_SIZE;
 
 #[derive(Component)]
 pub struct TipSprite;
@@ -14,19 +13,25 @@ pub struct TipSprite;
 #[derive(Component)]
 pub struct OrganismSprite;
 
+/// Sprite size based on hex inner radius (apothem) at ~70% fill.
 #[must_use]
-pub fn organism_sprite_size() -> Vec2 {
-    Vec2::splat(TILE_SIZE * 0.7)
+pub fn organism_sprite_size(layout: &HexLayout) -> Vec2 {
+    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
+    Vec2::splat(inner_radius * 1.4)
 }
 
 pub fn tip_render_system(
     mut commands: Commands,
     tip_positions: Res<TipPositions>,
     existing: Query<Entity, With<TipSprite>>,
+    layout: Res<HexLayout>,
 ) {
     for entity in existing.iter() {
         commands.entity(entity).despawn();
     }
+
+    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
+    let tip_size = Vec2::splat(inner_radius * 0.8);
 
     for (pos, spec) in &tip_positions.tips {
         let color = match spec {
@@ -37,13 +42,14 @@ pub fn tip_render_system(
             _ => Color::srgb(0.9, 0.9, 0.9),
         };
 
-        let world_pos = Vec3::new(pos.x as f32 * TILE_SIZE, pos.y as f32 * TILE_SIZE, 2.0);
+        let base_pos = layout.hex_to_world_pos(*pos);
+        let world_pos = Vec3::new(base_pos.x, base_pos.y, 2.0);
 
         commands.spawn((
             TipSprite,
             Sprite {
                 color,
-                custom_size: Some(Vec2::splat(TILE_SIZE * 0.4)),
+                custom_size: Some(tip_size),
                 ..default()
             },
             Transform::from_translation(world_pos),
@@ -62,6 +68,7 @@ pub fn organism_render_system(
     fruiting_bodies: Query<(Entity, &FruitingBody), Without<OrganismSprite>>,
     mushrooms: Query<(Entity, &MushroomEntity), Without<OrganismSprite>>,
     neutral_fungi: Query<(Entity, &GridPos, &NeutralFungusAgent), Without<OrganismSprite>>,
+    layout: Res<HexLayout>,
 ) {
     // Despawn sprites whose source entity no longer exists
     for (sprite_entity, link) in linked_sprites.iter() {
@@ -70,10 +77,10 @@ pub fn organism_render_system(
         }
     }
 
-    let size = organism_sprite_size();
+    let size = organism_sprite_size(&layout);
 
     for (source, gpos, _fragment) in fragments.iter() {
-        let world_pos = gpos.0.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -88,7 +95,7 @@ pub fn organism_render_system(
     }
 
     for (source, gpos, _plant) in plants.iter() {
-        let world_pos = gpos.0.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -103,7 +110,7 @@ pub fn organism_render_system(
     }
 
     for (source, gpos, _fauna_agent) in fauna.iter() {
-        let world_pos = gpos.0.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -118,7 +125,7 @@ pub fn organism_render_system(
     }
 
     for (source, body) in fruiting_bodies.iter() {
-        let world_pos = body.column_top.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(body.column_top);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -133,7 +140,7 @@ pub fn organism_render_system(
     }
 
     for (source, mushroom) in mushrooms.iter() {
-        let world_pos = mushroom.pos.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(mushroom.pos);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -148,7 +155,7 @@ pub fn organism_render_system(
     }
 
     for (source, gpos, _fungus) in neutral_fungi.iter() {
-        let world_pos = gpos.0.as_vec2() * TILE_SIZE;
+        let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
@@ -166,11 +173,14 @@ pub fn organism_render_system(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shroom_core::create_hex_layout;
 
     #[test]
-    fn organism_sprite_size_is_proportional_to_tile() {
-        let size = organism_sprite_size();
-        assert!(size.x >= 48.0 * 0.6);
-        assert!(size.x <= 48.0 * 0.75);
+    fn organism_sprite_size_is_proportional_to_hex() {
+        let layout = create_hex_layout();
+        let size = organism_sprite_size(&layout);
+        // inner_radius = 28.0 * sqrt(3)/2 ~= 24.25, * 1.4 ~= 33.9
+        assert!(size.x >= 30.0, "sprite too small: {}", size.x);
+        assert!(size.x <= 40.0, "sprite too large: {}", size.x);
     }
 }

@@ -525,7 +525,7 @@ pub struct NeutralFungiMerged {
 
 #[derive(Resource, Default, Debug)]
 pub struct TerrainSpriteMap {
-    pub sprites: HashMap<IVec2, Entity>,
+    pub sprites: HashMap<Hex, Entity>,
 }
 
 #[derive(Component, Debug)]

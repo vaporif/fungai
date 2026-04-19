@@ -5,21 +5,20 @@ use bevy::{
     shader::ShaderRef,
     sprite_render::Material2d,
 };
+use hexx::PlaneMeshBuilder;
 use shroom_core::*;
 
-pub const TILE_SIZE: f32 = 48.0;
-
-/// Packed uniform struct — matches the WGSL `TerrainUniforms` struct exactly.
+/// Packed uniform struct -- matches the WGSL `TerrainUniforms` struct exactly.
 #[derive(ShaderType, Debug, Clone)]
 pub struct TerrainUniforms {
-    pub base_color: LinearRgba, // vec4<f32> — 16 bytes
-    pub terrain_type: u32,      // u32 — 4 bytes
-    pub grid_x: u32,            // u32 — 4 bytes
-    pub grid_y: u32,            // u32 — 4 bytes
-    pub discovered: f32,        // f32 — 4 bytes
-    pub time: f32,              // f32 — 4 bytes
-    pub nutrient_level: f32,    // f32 — 4 bytes
-    pub _padding: f32,          // pad to 16-byte boundary — 4 bytes
+    pub base_color: LinearRgba, // vec4<f32> -- 16 bytes
+    pub terrain_type: u32,      // u32 -- 4 bytes
+    pub grid_x: u32,            // u32 -- 4 bytes (axial q coordinate, used for noise seed)
+    pub grid_y: u32,            // u32 -- 4 bytes (axial r coordinate, used for noise seed)
+    pub discovered: f32,        // f32 -- 4 bytes
+    pub time: f32,              // f32 -- 4 bytes
+    pub nutrient_level: f32,    // f32 -- 4 bytes
+    pub _padding: f32,          // pad to 16-byte boundary -- 4 bytes
 }
 
 #[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
@@ -36,7 +35,7 @@ impl Material2d for TerrainMaterial {
 
 #[derive(Component)]
 pub struct TerrainMeshTile {
-    pub grid_pos: IVec2,
+    pub grid_pos: Hex,
 }
 
 pub fn terrain_base_color(terrain: TerrainType) -> LinearRgba {
@@ -63,6 +62,21 @@ pub fn terrain_type_index(terrain: TerrainType) -> u32 {
     }
 }
 
+/// Build a 2D hex mesh from the layout. Uses `PlaneMeshBuilder` with Z-facing
+/// orientation so the hex lies flat on the XY plane for Bevy 2D.
+fn build_hex_mesh(layout: &HexLayout) -> Mesh {
+    let mesh_info = PlaneMeshBuilder::new(layout).facing(Vec3::Z).build();
+
+    Mesh::new(
+        bevy::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, mesh_info.vertices)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, mesh_info.normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, mesh_info.uvs)
+    .with_inserted_indices(bevy::mesh::Indices::U16(mesh_info.indices))
+}
+
 pub fn terrain_render_system(
     mut commands: Commands,
     tiles: Query<(&GridPos, &Tile), Changed<Tile>>,
@@ -71,6 +85,7 @@ pub fn terrain_render_system(
     mut materials: ResMut<Assets<TerrainMaterial>>,
     time: Res<Time>,
     discovery: Res<crate::data_layer::DiscoveryMap>,
+    layout: Res<HexLayout>,
 ) {
     for (gpos, tile) in tiles.iter() {
         if let Some(old_entity) = sprite_map.sprites.remove(&gpos.0) {
@@ -80,17 +95,14 @@ pub fn terrain_render_system(
         let base_color = terrain_base_color(tile.terrain);
         let t_index = terrain_type_index(tile.terrain);
 
-        // Deterministic jitter seeded by grid position
+        // Deterministic jitter seeded by axial coordinates
         let seed = (gpos.0.x.wrapping_mul(73_856_093)) ^ (gpos.0.y.wrapping_mul(19_349_663));
         let jitter_x = ((seed & 0xFF) as f32 / 255.0 - 0.5) * 3.0;
         let jitter_y = (((seed >> 8) & 0xFF) as f32 / 255.0 - 0.5) * 3.0;
         let rotation = ((seed >> 16) & 0xFF) as f32 / 255.0 * 0.05 - 0.025;
 
-        let world_pos = Vec3::new(
-            gpos.0.x as f32 * TILE_SIZE + jitter_x,
-            gpos.0.y as f32 * TILE_SIZE + jitter_y,
-            0.0,
-        );
+        let base_pos = layout.hex_to_world_pos(gpos.0);
+        let world_pos = Vec3::new(base_pos.x + jitter_x, base_pos.y + jitter_y, 0.0);
 
         let material = materials.add(TerrainMaterial {
             uniforms: TerrainUniforms {
@@ -108,7 +120,7 @@ pub fn terrain_render_system(
         let entity = commands
             .spawn((
                 TerrainMeshTile { grid_pos: gpos.0 },
-                Mesh2d(meshes.add(Rectangle::new(TILE_SIZE, TILE_SIZE))),
+                Mesh2d(meshes.add(build_hex_mesh(&layout))),
                 MeshMaterial2d(material),
                 Transform::from_translation(world_pos)
                     .with_rotation(Quat::from_rotation_z(rotation)),
@@ -144,11 +156,6 @@ mod tests {
     use bevy::asset::AssetPlugin;
     use bevy::sprite_render::Material2dPlugin;
     use bevy::MinimalPlugins;
-
-    #[test]
-    fn tile_size_is_48() {
-        assert_eq!(TILE_SIZE, 48.0);
-    }
 
     #[test]
     fn terrain_material_stores_uniforms() {
@@ -190,8 +197,9 @@ mod tests {
         app.init_resource::<RegionStates>();
         app.init_resource::<TerrainSpriteMap>();
         app.init_resource::<crate::data_layer::DiscoveryMap>();
+        app.insert_resource(create_hex_layout());
 
-        let pos = IVec2::new(3, 4);
+        let pos = Hex::new(3, 4);
         let e = app
             .world_mut()
             .spawn((

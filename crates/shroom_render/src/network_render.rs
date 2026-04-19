@@ -9,10 +9,10 @@ use bevy::{
     shader::ShaderRef,
     sprite_render::{AlphaMode2d, Material2d},
 };
-use shroom_core::{RegionId, RivalId};
+use hexx::Hex;
+use shroom_core::{HexLayout, RegionId, RivalId};
 
 use crate::data_layer::{BranchEdge, BranchGraph, RivalBranchGraph};
-use crate::terrain_render::TILE_SIZE;
 
 const SPLINE_SAMPLES: usize = 12;
 const STRANDS_PER_EDGE: usize = 3;
@@ -216,8 +216,8 @@ fn build_spline_mesh_inner(
 
 /// Count how many edges connect to each node for junction/leaf detection.
 #[cfg(test)]
-fn compute_node_degrees(graph: &BranchGraph) -> HashMap<IVec2, usize> {
-    let mut counts: HashMap<IVec2, usize> = HashMap::new();
+fn compute_node_degrees(graph: &BranchGraph) -> HashMap<Hex, usize> {
+    let mut counts: HashMap<Hex, usize> = HashMap::new();
     for edge in &graph.edges {
         *counts.entry(edge.from).or_default() += 1;
         *counts.entry(edge.to).or_default() += 1;
@@ -227,8 +227,8 @@ fn compute_node_degrees(graph: &BranchGraph) -> HashMap<IVec2, usize> {
 
 /// Group player nodes by region, returning position and biomass pairs.
 #[must_use]
-fn group_player_nodes_by_region(graph: &BranchGraph) -> HashMap<RegionId, Vec<(IVec2, f32)>> {
-    let mut groups: HashMap<RegionId, Vec<(IVec2, f32)>> = HashMap::new();
+fn group_player_nodes_by_region(graph: &BranchGraph) -> HashMap<RegionId, Vec<(Hex, f32)>> {
+    let mut groups: HashMap<RegionId, Vec<(Hex, f32)>> = HashMap::new();
     for node in graph.nodes.values() {
         groups
             .entry(node.region_id)
@@ -240,8 +240,8 @@ fn group_player_nodes_by_region(graph: &BranchGraph) -> HashMap<RegionId, Vec<(I
 
 /// Group rival nodes by rival_id, returning position and biomass pairs.
 #[must_use]
-fn group_rival_nodes_by_id(graph: &RivalBranchGraph) -> HashMap<RivalId, Vec<(IVec2, f32)>> {
-    let mut groups: HashMap<RivalId, Vec<(IVec2, f32)>> = HashMap::new();
+fn group_rival_nodes_by_id(graph: &RivalBranchGraph) -> HashMap<RivalId, Vec<(Hex, f32)>> {
+    let mut groups: HashMap<RivalId, Vec<(Hex, f32)>> = HashMap::new();
     for node in graph.nodes.values() {
         groups
             .entry(node.rival_id)
@@ -253,17 +253,21 @@ fn group_rival_nodes_by_id(graph: &RivalBranchGraph) -> HashMap<RivalId, Vec<(IV
 
 /// Pick the node closest to the centroid of the group as root.
 #[must_use]
-fn pick_root_node(nodes: &[(IVec2, f32)]) -> IVec2 {
+fn pick_root_node(nodes: &[(Hex, f32)], layout: &HexLayout) -> Hex {
     assert!(!nodes.is_empty(), "cannot pick root from empty node list");
 
     #[allow(clippy::cast_precision_loss)]
-    let centroid = nodes.iter().map(|(pos, _)| pos.as_vec2()).sum::<Vec2>() / nodes.len() as f32;
+    let centroid = nodes
+        .iter()
+        .map(|(pos, _)| layout.hex_to_world_pos(*pos))
+        .sum::<Vec2>()
+        / nodes.len() as f32;
 
     nodes
         .iter()
         .min_by(|(a, _), (b, _)| {
-            let da = a.as_vec2().distance_squared(centroid);
-            let db = b.as_vec2().distance_squared(centroid);
+            let da = layout.hex_to_world_pos(*a).distance_squared(centroid);
+            let db = layout.hex_to_world_pos(*b).distance_squared(centroid);
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(pos, _)| *pos)
@@ -273,9 +277,9 @@ fn pick_root_node(nodes: &[(IVec2, f32)]) -> IVec2 {
 /// BFS from root through edges that connect nodes in `node_set`.
 /// Returns (parent, child) directed edge pairs in BFS order.
 #[must_use]
-fn bfs_edges(root: IVec2, node_set: &HashSet<IVec2>, edges: &[BranchEdge]) -> Vec<(IVec2, IVec2)> {
+fn bfs_edges(root: Hex, node_set: &HashSet<Hex>, edges: &[BranchEdge]) -> Vec<(Hex, Hex)> {
     // Build adjacency list restricted to node_set
-    let mut adjacency: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
+    let mut adjacency: HashMap<Hex, Vec<Hex>> = HashMap::new();
     for edge in edges {
         if node_set.contains(&edge.from) && node_set.contains(&edge.to) {
             adjacency.entry(edge.from).or_default().push(edge.to);
@@ -311,6 +315,7 @@ fn generate_decorative_branches(
     main_dir: Vec2,
     biomass: f32,
     seed: u32,
+    hex_outer_radius: f32,
 ) -> Vec<(Vec2, Vec2)> {
     // Determine branch count: 0 for low biomass, up to 2 for high
     let hash0 = seed.wrapping_mul(2_654_435_761);
@@ -344,11 +349,11 @@ fn generate_decorative_branches(
         #[allow(clippy::cast_precision_loss)]
         let angle_frac = (h as f32 / u32::MAX as f32) * 2.0 - 1.0;
 
-        // Length: 0.5 to 1.5 tiles
+        // Length: 0.5 to 1.5 hex radii
         let h2 = h.wrapping_mul(2_654_435_761);
         #[allow(clippy::cast_precision_loss)]
         let len_frac = h2 as f32 / u32::MAX as f32;
-        let length = (0.5 + len_frac) * TILE_SIZE;
+        let length = (0.5 + len_frac) * hex_outer_radius;
 
         // Direction is a blend of main_dir forward component + perpendicular splay
         let dir = (main_dir * 0.3 + perp * angle_frac).normalize_or_zero();
@@ -361,7 +366,12 @@ fn generate_decorative_branches(
 
 /// Generate 2-3 daughter forks at a leaf tip node, splaying outward.
 #[must_use]
-fn generate_tip_forks(world_pos: Vec2, approach_dir: Vec2, seed: u32) -> Vec<(Vec2, Vec2)> {
+fn generate_tip_forks(
+    world_pos: Vec2,
+    approach_dir: Vec2,
+    seed: u32,
+    hex_outer_radius: f32,
+) -> Vec<(Vec2, Vec2)> {
     let hash0 = seed.wrapping_mul(2_654_435_761);
     #[allow(clippy::cast_precision_loss)]
     let count = if (hash0 as f32 / u32::MAX as f32) < 0.5 {
@@ -386,7 +396,7 @@ fn generate_tip_forks(world_pos: Vec2, approach_dir: Vec2, seed: u32) -> Vec<(Ve
         let base_spread = (i as f32 / (count as f32 - 0.5)) - 0.5; // roughly [-0.5, 0.5]
 
         let dir = (approach_dir * 0.7 + perp * (base_spread + splay * 0.3)).normalize_or_zero();
-        let length = TILE_SIZE * (0.4 + splay.abs() * 0.4);
+        let length = hex_outer_radius * (0.4 + splay.abs() * 0.4);
         let end = world_pos + dir * length;
         forks.push((world_pos, end));
     }
@@ -400,22 +410,25 @@ fn generate_tip_forks(world_pos: Vec2, approach_dir: Vec2, seed: u32) -> Vec<(Ve
 /// `tip_fork` enables tip forking at degree-1 leaf nodes.
 #[must_use]
 fn build_branch_tree(
-    nodes: &[(IVec2, f32)],
+    nodes: &[(Hex, f32)],
     edges: &[BranchEdge],
     max_decorative: usize,
     tip_fork: bool,
+    layout: &HexLayout,
 ) -> Vec<Mesh> {
     if nodes.is_empty() {
         return Vec::new();
     }
 
-    let node_set: HashSet<IVec2> = nodes.iter().map(|(pos, _)| *pos).collect();
-    let biomass_map: HashMap<IVec2, f32> = nodes.iter().copied().collect();
-    let root = pick_root_node(nodes);
+    let hex_outer_radius = layout.scale.x;
+
+    let node_set: HashSet<Hex> = nodes.iter().map(|(pos, _)| *pos).collect();
+    let biomass_map: HashMap<Hex, f32> = nodes.iter().copied().collect();
+    let root = pick_root_node(nodes, layout);
     let tree_edges = bfs_edges(root, &node_set, edges);
 
     // Compute degrees on BFS tree edges (not original graph) for leaf detection
-    let mut degrees: HashMap<IVec2, usize> = HashMap::new();
+    let mut degrees: HashMap<Hex, usize> = HashMap::new();
     for (parent, child) in &tree_edges {
         *degrees.entry(*parent).or_default() += 1;
         *degrees.entry(*child).or_default() += 1;
@@ -424,8 +437,8 @@ fn build_branch_tree(
     let mut result: Vec<Mesh> = Vec::new();
 
     for (idx, (parent, child)) in tree_edges.iter().enumerate() {
-        let from_world = parent.as_vec2() * TILE_SIZE;
-        let to_world = child.as_vec2() * TILE_SIZE;
+        let from_world = layout.hex_to_world_pos(*parent);
+        let to_world = layout.hex_to_world_pos(*child);
 
         // Generate STRANDS_PER_EDGE spline strands per edge
         for strand in 0..STRANDS_PER_EDGE {
@@ -444,7 +457,13 @@ fn build_branch_tree(
             let child_biomass = biomass_map.get(child).copied().unwrap_or(1.0);
             #[allow(clippy::cast_possible_truncation)]
             let deco_seed = (idx as u32).wrapping_mul(19_349_669);
-            let decos = generate_decorative_branches(to_world, dir, child_biomass, deco_seed);
+            let decos = generate_decorative_branches(
+                to_world,
+                dir,
+                child_biomass,
+                deco_seed,
+                hex_outer_radius,
+            );
             for (deco_start, deco_end) in decos.into_iter().take(max_decorative) {
                 let (mesh, _) = build_spline_mesh_with_wobble(
                     deco_start,
@@ -463,7 +482,7 @@ fn build_branch_tree(
                 let dir = (to_world - from_world).normalize_or_zero();
                 #[allow(clippy::cast_possible_truncation)]
                 let fork_seed = (idx as u32).wrapping_mul(91_939_117);
-                let forks = generate_tip_forks(to_world, dir, fork_seed);
+                let forks = generate_tip_forks(to_world, dir, fork_seed, hex_outer_radius);
                 for (fork_start, fork_end) in forks {
                     let (mesh, _) = build_spline_mesh_with_wobble(
                         fork_start,
@@ -488,6 +507,7 @@ pub fn network_render_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut net_materials: ResMut<Assets<NetworkMaterial>>,
     time: Res<Time>,
+    layout: Res<HexLayout>,
 ) {
     if !graph.is_changed() && !rival_graph.is_changed() {
         return;
@@ -520,7 +540,7 @@ pub fn network_render_system(
             }
         };
 
-        let tree_meshes = build_branch_tree(region_nodes, &graph.edges, 2, true);
+        let tree_meshes = build_branch_tree(region_nodes, &graph.edges, 2, true, &layout);
 
         for mesh in tree_meshes {
             commands.spawn((
@@ -555,7 +575,7 @@ pub fn network_render_system(
             }
         };
 
-        let tree_meshes = build_branch_tree(rival_nodes, &rival_graph.edges, 0, false);
+        let tree_meshes = build_branch_tree(rival_nodes, &rival_graph.edges, 0, false, &layout);
 
         for mesh in tree_meshes {
             commands.spawn((
@@ -579,7 +599,7 @@ pub fn network_render_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shroom_core::SpecializationType;
+    use shroom_core::{create_hex_layout, SpecializationType};
 
     #[test]
     fn catmull_rom_passes_through_control_points() {
@@ -810,9 +830,9 @@ mod tests {
     #[test]
     fn compute_node_degrees_counts_edges() {
         let mut graph = BranchGraph::default();
-        let a = IVec2::new(0, 0);
-        let b = IVec2::new(1, 0);
-        let c = IVec2::new(2, 0);
+        let a = Hex::new(0, 0);
+        let b = Hex::new(1, 0);
+        let c = Hex::new(2, 0);
 
         graph.edges.push(BranchEdge {
             from: a,
@@ -842,27 +862,27 @@ mod tests {
         let r2 = RegionId(2);
 
         graph.nodes.insert(
-            IVec2::new(0, 0),
+            Hex::new(0, 0),
             BranchNode {
-                pos: IVec2::new(0, 0),
+                pos: Hex::new(0, 0),
                 biomass: 1.0,
                 specialization: None,
                 region_id: r1,
             },
         );
         graph.nodes.insert(
-            IVec2::new(1, 0),
+            Hex::new(1, 0),
             BranchNode {
-                pos: IVec2::new(1, 0),
+                pos: Hex::new(1, 0),
                 biomass: 2.0,
                 specialization: None,
                 region_id: r1,
             },
         );
         graph.nodes.insert(
-            IVec2::new(5, 5),
+            Hex::new(5, 5),
             BranchNode {
-                pos: IVec2::new(5, 5),
+                pos: Hex::new(5, 5),
                 biomass: 3.0,
                 specialization: None,
                 region_id: r2,
@@ -884,17 +904,17 @@ mod tests {
         let r2 = RivalId(1);
 
         graph.nodes.insert(
-            IVec2::new(0, 0),
+            Hex::new(0, 0),
             RivalBranchNode {
-                pos: IVec2::new(0, 0),
+                pos: Hex::new(0, 0),
                 biomass: 1.0,
                 rival_id: r1,
             },
         );
         graph.nodes.insert(
-            IVec2::new(1, 0),
+            Hex::new(1, 0),
             RivalBranchNode {
-                pos: IVec2::new(1, 0),
+                pos: Hex::new(1, 0),
                 biomass: 2.0,
                 rival_id: r2,
             },
@@ -910,57 +930,58 @@ mod tests {
 
     #[test]
     fn pick_root_node_selects_centroid_closest() {
+        let layout = create_hex_layout();
         let nodes = vec![
-            (IVec2::new(0, 0), 1.0),
-            (IVec2::new(2, 0), 1.0),
-            (IVec2::new(4, 0), 1.0),
+            (Hex::new(0, 0), 1.0),
+            (Hex::new(2, 0), 1.0),
+            (Hex::new(4, 0), 1.0),
         ];
-        // Centroid is (2, 0)
-        let root = pick_root_node(&nodes);
-        assert_eq!(root, IVec2::new(2, 0));
+        // Centroid in world coords is closest to Hex(2,0)
+        let root = pick_root_node(&nodes, &layout);
+        assert_eq!(root, Hex::new(2, 0));
     }
 
     #[test]
     fn bfs_edges_traverses_connected_graph() {
-        let nodes: HashSet<IVec2> = [IVec2::new(0, 0), IVec2::new(1, 0), IVec2::new(2, 0)]
+        let nodes: HashSet<Hex> = [Hex::new(0, 0), Hex::new(1, 0), Hex::new(2, 0)]
             .into_iter()
             .collect();
         let edges = vec![
             BranchEdge {
-                from: IVec2::new(0, 0),
-                to: IVec2::new(1, 0),
+                from: Hex::new(0, 0),
+                to: Hex::new(1, 0),
                 thickness: 1.0,
             },
             BranchEdge {
-                from: IVec2::new(1, 0),
-                to: IVec2::new(2, 0),
+                from: Hex::new(1, 0),
+                to: Hex::new(2, 0),
                 thickness: 1.0,
             },
         ];
 
-        let result = bfs_edges(IVec2::new(0, 0), &nodes, &edges);
+        let result = bfs_edges(Hex::new(0, 0), &nodes, &edges);
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0], (IVec2::new(0, 0), IVec2::new(1, 0)));
-        assert_eq!(result[1], (IVec2::new(1, 0), IVec2::new(2, 0)));
+        assert_eq!(result[0], (Hex::new(0, 0), Hex::new(1, 0)));
+        assert_eq!(result[1], (Hex::new(1, 0), Hex::new(2, 0)));
     }
 
     #[test]
     fn bfs_edges_skips_nodes_outside_set() {
-        let nodes: HashSet<IVec2> = [IVec2::new(0, 0), IVec2::new(1, 0)].into_iter().collect();
+        let nodes: HashSet<Hex> = [Hex::new(0, 0), Hex::new(1, 0)].into_iter().collect();
         let edges = vec![
             BranchEdge {
-                from: IVec2::new(0, 0),
-                to: IVec2::new(1, 0),
+                from: Hex::new(0, 0),
+                to: Hex::new(1, 0),
                 thickness: 1.0,
             },
             BranchEdge {
-                from: IVec2::new(1, 0),
-                to: IVec2::new(2, 0), // not in set
+                from: Hex::new(1, 0),
+                to: Hex::new(2, 0), // not in set
                 thickness: 1.0,
             },
         ];
 
-        let result = bfs_edges(IVec2::new(0, 0), &nodes, &edges);
+        let result = bfs_edges(Hex::new(0, 0), &nodes, &edges);
         assert_eq!(result.len(), 1);
     }
 
@@ -968,20 +989,38 @@ mod tests {
 
     #[test]
     fn decorative_branches_scale_with_biomass() {
-        let low = generate_decorative_branches(Vec2::new(48.0, 48.0), Vec2::new(0.0, 1.0), 0.5, 42);
-        let high =
-            generate_decorative_branches(Vec2::new(48.0, 48.0), Vec2::new(0.0, 1.0), 5.0, 42);
+        let hex_outer_radius = 28.0;
+        let low = generate_decorative_branches(
+            Vec2::new(48.0, 48.0),
+            Vec2::new(0.0, 1.0),
+            0.5,
+            42,
+            hex_outer_radius,
+        );
+        let high = generate_decorative_branches(
+            Vec2::new(48.0, 48.0),
+            Vec2::new(0.0, 1.0),
+            5.0,
+            42,
+            hex_outer_radius,
+        );
         assert!(high.len() >= low.len());
     }
 
     #[test]
     fn decorative_branches_are_short() {
-        let branches =
-            generate_decorative_branches(Vec2::new(48.0, 48.0), Vec2::new(0.0, 1.0), 3.0, 7);
+        let hex_outer_radius = 28.0;
+        let branches = generate_decorative_branches(
+            Vec2::new(48.0, 48.0),
+            Vec2::new(0.0, 1.0),
+            3.0,
+            7,
+            hex_outer_radius,
+        );
         for (start, end) in &branches {
             let length = (*end - *start).length();
             assert!(
-                length <= 1.5 * TILE_SIZE + 1.0,
+                length <= 1.5 * hex_outer_radius + 1.0,
                 "decorative branch too long: {length}"
             );
         }
@@ -991,7 +1030,13 @@ mod tests {
 
     #[test]
     fn tip_forks_produce_2_to_3_daughters() {
-        let forks = generate_tip_forks(Vec2::new(96.0, 96.0), Vec2::new(1.0, 0.0), 42);
+        let hex_outer_radius = 28.0;
+        let forks = generate_tip_forks(
+            Vec2::new(96.0, 96.0),
+            Vec2::new(1.0, 0.0),
+            42,
+            hex_outer_radius,
+        );
         assert!(
             forks.len() >= 2 && forks.len() <= 3,
             "expected 2-3 forks, got {}",
@@ -1002,7 +1047,8 @@ mod tests {
     #[test]
     fn tip_forks_splay_outward() {
         let parent_dir = Vec2::new(1.0, 0.0);
-        let forks = generate_tip_forks(Vec2::new(0.0, 0.0), parent_dir, 42);
+        let hex_outer_radius = 28.0;
+        let forks = generate_tip_forks(Vec2::new(0.0, 0.0), parent_dir, 42, hex_outer_radius);
         for (start, end) in &forks {
             let fork_dir = (*end - *start).normalize_or_zero();
             let dot = fork_dir.dot(parent_dir);
@@ -1017,25 +1063,26 @@ mod tests {
 
     #[test]
     fn build_branch_tree_produces_meshes_for_edges() {
+        let layout = create_hex_layout();
         let nodes = vec![
-            (IVec2::new(0, 0), 1.0),
-            (IVec2::new(1, 0), 2.0),
-            (IVec2::new(2, 0), 1.0),
+            (Hex::new(0, 0), 1.0),
+            (Hex::new(1, 0), 2.0),
+            (Hex::new(2, 0), 1.0),
         ];
         let edges = vec![
             BranchEdge {
-                from: IVec2::new(0, 0),
-                to: IVec2::new(1, 0),
+                from: Hex::new(0, 0),
+                to: Hex::new(1, 0),
                 thickness: 1.0,
             },
             BranchEdge {
-                from: IVec2::new(1, 0),
-                to: IVec2::new(2, 0),
+                from: Hex::new(1, 0),
+                to: Hex::new(2, 0),
                 thickness: 1.0,
             },
         ];
 
-        let result = build_branch_tree(&nodes, &edges, 2, true);
+        let result = build_branch_tree(&nodes, &edges, 2, true, &layout);
         // At least 2 edges * STRANDS_PER_EDGE strands
         assert!(
             result.len() >= 2 * STRANDS_PER_EDGE,
@@ -1047,26 +1094,27 @@ mod tests {
 
     #[test]
     fn build_branch_tree_no_decoratives_for_rivals() {
+        let layout = create_hex_layout();
         let nodes = vec![
-            (IVec2::new(0, 0), 3.0),
-            (IVec2::new(1, 0), 3.0),
-            (IVec2::new(2, 0), 3.0),
+            (Hex::new(0, 0), 3.0),
+            (Hex::new(1, 0), 3.0),
+            (Hex::new(2, 0), 3.0),
         ];
         let edges = vec![
             BranchEdge {
-                from: IVec2::new(0, 0),
-                to: IVec2::new(1, 0),
+                from: Hex::new(0, 0),
+                to: Hex::new(1, 0),
                 thickness: 1.0,
             },
             BranchEdge {
-                from: IVec2::new(1, 0),
-                to: IVec2::new(2, 0),
+                from: Hex::new(1, 0),
+                to: Hex::new(2, 0),
                 thickness: 1.0,
             },
         ];
 
-        let with_deco = build_branch_tree(&nodes, &edges, 2, true);
-        let without_deco = build_branch_tree(&nodes, &edges, 0, false);
+        let with_deco = build_branch_tree(&nodes, &edges, 2, true, &layout);
+        let without_deco = build_branch_tree(&nodes, &edges, 0, false, &layout);
         assert!(
             with_deco.len() >= without_deco.len(),
             "decoratives should add meshes: with={} without={}",

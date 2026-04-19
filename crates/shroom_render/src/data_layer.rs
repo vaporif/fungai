@@ -1,17 +1,18 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
+use hexx::Hex;
 use shroom_core::*;
 
 #[derive(Resource, Default, Debug)]
 pub struct BranchGraph {
-    pub nodes: HashMap<IVec2, BranchNode>,
+    pub nodes: HashMap<Hex, BranchNode>,
     pub edges: Vec<BranchEdge>,
 }
 
 #[derive(Debug)]
 pub struct BranchNode {
-    pub pos: IVec2,
+    pub pos: Hex,
     pub biomass: f32,
     pub specialization: Option<SpecializationType>,
     pub region_id: RegionId,
@@ -19,14 +20,14 @@ pub struct BranchNode {
 
 #[derive(Debug)]
 pub struct BranchEdge {
-    pub from: IVec2,
-    pub to: IVec2,
+    pub from: Hex,
+    pub to: Hex,
     pub thickness: f32,
 }
 
 #[derive(Resource, Default, Debug)]
 pub struct TipPositions {
-    pub tips: Vec<(IVec2, Option<SpecializationType>)>,
+    pub tips: Vec<(Hex, Option<SpecializationType>)>,
 }
 
 #[derive(Resource, Default, Debug)]
@@ -38,18 +39,18 @@ pub struct RegionHulls {
 pub struct DiscoveryMap {
     /// Maps tile position to discovery level (0.0 = fully hidden, 1.0 = fully revealed).
     /// Tiles near the network get higher values; tiles far away get lower values.
-    pub discovered: HashMap<IVec2, f32>,
+    pub discovered: HashMap<Hex, f32>,
 }
 
 #[derive(Resource, Default, Debug)]
 pub struct RivalBranchGraph {
-    pub nodes: HashMap<IVec2, RivalBranchNode>,
+    pub nodes: HashMap<Hex, RivalBranchNode>,
     pub edges: Vec<BranchEdge>,
 }
 
 #[derive(Debug)]
 pub struct RivalBranchNode {
-    pub pos: IVec2,
+    pub pos: Hex,
     pub biomass: f32,
     pub rival_id: RivalId,
 }
@@ -78,8 +79,8 @@ pub fn extract_branch_graph(
         }
     }
 
-    let mut seen_edges: HashSet<(IVec2, IVec2)> = HashSet::default();
-    let node_keys: Vec<IVec2> = graph.nodes.keys().copied().collect();
+    let mut seen_edges: HashSet<(Hex, Hex)> = HashSet::default();
+    let node_keys: Vec<Hex> = graph.nodes.keys().copied().collect();
     for pos in node_keys {
         for (npos, _) in grid.neighbors(pos) {
             if graph.nodes.contains_key(&npos) {
@@ -125,7 +126,7 @@ pub fn extract_region_hulls(tiles: Query<(&GridPos, &Tile)>, mut hulls: ResMut<R
             region_positions
                 .entry(rid)
                 .or_default()
-                .push(gpos.0.as_vec2());
+                .push(Vec2::new(gpos.0.x as f32, gpos.0.y as f32));
         }
     }
 
@@ -159,11 +160,11 @@ pub fn extract_region_hulls(tiles: Query<(&GridPos, &Tile)>, mut hulls: ResMut<R
 pub fn extract_discovery_map(graph: Res<BranchGraph>, mut discovery: ResMut<DiscoveryMap>) {
     discovery.discovered.clear();
 
-    let radius: i32 = 8;
+    let radius: u32 = 8;
     let fully_hidden_threshold: f32 = 0.02;
     let fully_visible_threshold: f32 = 0.12;
 
-    let mut influence_map: HashMap<IVec2, f32> = HashMap::new();
+    let mut influence_map: HashMap<Hex, f32> = HashMap::new();
 
     // Network tiles are always fully visible
     for &node_pos in graph.nodes.keys() {
@@ -171,34 +172,33 @@ pub fn extract_discovery_map(graph: Res<BranchGraph>, mut discovery: ResMut<Disc
     }
 
     for &node_pos in graph.nodes.keys() {
-        for dx in -radius..=radius {
-            for dy in -radius..=radius {
-                let tile = node_pos + IVec2::new(dx, dy);
-
-                // Skip tiles that are network nodes — already fully visible
-                if graph.nodes.contains_key(&tile) {
-                    continue;
-                }
-
-                // Noise displacement using integer hash to break up rectangular boundary
-                let noise_x = (tile.x.wrapping_mul(73_856_093) ^ tile.y.wrapping_mul(19_349_663))
-                    as f32
-                    / (i32::MAX as f32);
-                let noise_y = (tile.x.wrapping_mul(19_349_663) ^ tile.y.wrapping_mul(73_856_093))
-                    as f32
-                    / (i32::MAX as f32);
-                let noise_offset = Vec2::new(noise_x, noise_y) * 1.5;
-
-                let displaced = tile.as_vec2() + noise_offset;
-                let dist = displaced.distance(node_pos.as_vec2());
-
-                if dist > radius as f32 {
-                    continue;
-                }
-
-                let influence = 1.0 / (dist * dist + 1.0);
-                *influence_map.entry(tile).or_default() += influence;
+        // Use hex range iteration instead of rectangular dx/dy loops
+        for tile in node_pos.range(radius) {
+            // Skip tiles that are network nodes -- already fully visible
+            if graph.nodes.contains_key(&tile) {
+                continue;
             }
+
+            // Noise displacement using integer hash to break up the boundary
+            let noise_x = (tile.x.wrapping_mul(73_856_093) ^ tile.y.wrapping_mul(19_349_663))
+                as f32
+                / (i32::MAX as f32);
+            let noise_y = (tile.x.wrapping_mul(19_349_663) ^ tile.y.wrapping_mul(73_856_093))
+                as f32
+                / (i32::MAX as f32);
+            let noise_offset = Vec2::new(noise_x, noise_y) * 1.5;
+
+            let tile_pos = Vec2::new(tile.x as f32, tile.y as f32);
+            let node_vec = Vec2::new(node_pos.x as f32, node_pos.y as f32);
+            let displaced = tile_pos + noise_offset;
+            let dist = displaced.distance(node_vec);
+
+            if dist > radius as f32 {
+                continue;
+            }
+
+            let influence = 1.0 / (dist * dist + 1.0);
+            *influence_map.entry(tile).or_default() += influence;
         }
     }
 
@@ -239,8 +239,8 @@ pub fn extract_rival_branch_graph(
         }
     }
 
-    let mut seen_edges: HashSet<(IVec2, IVec2)> = HashSet::default();
-    let node_keys: Vec<IVec2> = graph.nodes.keys().copied().collect();
+    let mut seen_edges: HashSet<(Hex, Hex)> = HashSet::default();
+    let node_keys: Vec<Hex> = graph.nodes.keys().copied().collect();
     for pos in node_keys {
         for (npos, _) in grid.neighbors(pos) {
             if graph.nodes.contains_key(&npos) {
@@ -286,8 +286,8 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        for x in 0..3 {
-            let pos = IVec2::new(x, 0);
+        for q in 0..3 {
+            let pos = Hex::new(q, 0);
             let e = app
                 .world_mut()
                 .spawn((
@@ -321,7 +321,7 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        let pos = IVec2::new(5, 5);
+        let pos = Hex::new(5, 5);
         app.world_mut().spawn((
             GridPos(pos),
             HyphalTip {
@@ -346,9 +346,9 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        for x in 0..3 {
-            for y in 0..2 {
-                let pos = IVec2::new(x, y);
+        for q in 0..3 {
+            for r in 0..2 {
+                let pos = Hex::new(q, r);
                 app.world_mut().spawn((
                     GridPos(pos),
                     Tile {
@@ -378,7 +378,7 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
-        let pos = IVec2::new(10, 10);
+        let pos = Hex::new(10, 10);
         let e = app
             .world_mut()
             .spawn((
@@ -406,7 +406,7 @@ mod tests {
         // Center tile: fully discovered
         let center = discovery
             .discovered
-            .get(&IVec2::new(10, 10))
+            .get(&Hex::new(10, 10))
             .copied()
             .unwrap_or(0.0);
         assert_eq!(center, 1.0);
@@ -414,7 +414,7 @@ mod tests {
         // Distance 2: well-discovered with lowered thresholds
         let near = discovery
             .discovered
-            .get(&IVec2::new(12, 10))
+            .get(&Hex::new(12, 10))
             .copied()
             .unwrap_or(0.0);
         assert!(near > 0.5, "near tile should be well-discovered: {near}");
@@ -422,14 +422,14 @@ mod tests {
         // Distance 7: barely discovered (near edge of radius 8)
         let far = discovery
             .discovered
-            .get(&IVec2::new(17, 10))
+            .get(&Hex::new(17, 10))
             .copied()
             .unwrap_or(0.0);
         assert!(far < 0.5, "far tile should be dimly discovered: {far}");
 
         // Distance 9: outside radius 8
         assert!(
-            discovery.discovered.get(&IVec2::new(19, 10)).is_none(),
+            discovery.discovered.get(&Hex::new(19, 10)).is_none(),
             "tiles outside radius 8 should not be in the map"
         );
     }
@@ -440,8 +440,8 @@ mod tests {
         app.init_resource::<RivalBranchGraph>();
 
         let rival_id = RivalId(0);
-        for x in 0..3 {
-            let pos = IVec2::new(x, 5);
+        for q in 0..3 {
+            let pos = Hex::new(q, 5);
             let e = app
                 .world_mut()
                 .spawn((

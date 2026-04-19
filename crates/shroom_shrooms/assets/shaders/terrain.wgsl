@@ -3,8 +3,8 @@
 struct TerrainUniforms {
     base_color: vec4<f32>,
     terrain_type: u32,
-    grid_x: u32,
-    grid_y: u32,
+    grid_x: u32, // axial q coordinate, used as noise seed
+    grid_y: u32, // axial r coordinate, used as noise seed
     discovered: f32,
     time: f32,
     nutrient_level: f32,
