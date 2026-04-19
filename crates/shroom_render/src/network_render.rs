@@ -270,7 +270,7 @@ pub fn network_render_system(
         let perp = Vec2::new(-edge_dir.y, edge_dir.x);
 
         for strand in 0..STRANDS_PER_EDGE {
-            let strand_seed = base_seed.wrapping_add(strand as u32 * 2_654_435_761);
+            let strand_seed = base_seed.wrapping_add((strand as u32).wrapping_mul(2_654_435_761));
 
             // Fan strands out from the center line
             let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
@@ -350,7 +350,7 @@ pub fn network_render_system(
         let perp = Vec2::new(-edge_dir.y, edge_dir.x);
 
         for strand in 0..STRANDS_PER_EDGE {
-            let strand_seed = base_seed.wrapping_add(strand as u32 * 2_654_435_761);
+            let strand_seed = base_seed.wrapping_add((strand as u32).wrapping_mul(2_654_435_761));
             let spread = (strand as f32 - (STRANDS_PER_EDGE - 1) as f32 * 0.5) * strand_width * 0.8;
             let (mesh, _) = build_spline_mesh_with_wobble(
                 from + perp * spread,
