@@ -40,6 +40,10 @@ pub fn tick_advancement_system(
         return;
     }
     tick_timer.timer.unpause();
+    let target = std::time::Duration::from_secs_f32(speed.duration_secs());
+    if tick_timer.timer.duration() != target {
+        tick_timer.timer.set_duration(target);
+    }
     tick_timer.timer.tick(time.delta());
     if tick_timer.timer.just_finished() {
         game_state.turn += 1;
