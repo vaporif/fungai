@@ -9,6 +9,15 @@ license = "MIT"
 
 [workspace.dependencies]
 bevy = "0.18"
+shroom_core = { path = "crates/shroom_core" }
+shroom_world = { path = "crates/shroom_world" }
+shroom_growth = { path = "crates/shroom_growth" }
+shroom_regions = { path = "crates/shroom_regions" }
+shroom_render = { path = "crates/shroom_render" }
+shroom_input = { path = "crates/shroom_input" }
+shroom_ai = { path = "crates/shroom_ai" }
+shroom_fruiting = { path = "crates/shroom_fruiting" }
+shroom_ui = { path = "crates/shroom_ui" }
 
 [profile.dev]
 opt-level = 1

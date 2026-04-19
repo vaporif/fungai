@@ -4,5 +4,17 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+dev = ["bevy/dynamic_linking", "bevy/hotpatching", "bevy/dev"]
+
 [dependencies]
 bevy = { workspace = true }
+shroom_core = { workspace = true }
+shroom_world = { workspace = true }
+shroom_growth = { workspace = true }
+shroom_regions = { workspace = true }
+shroom_render = { workspace = true }
+shroom_input = { workspace = true }
+shroom_ai = { workspace = true }
+shroom_fruiting = { workspace = true }
+shroom_ui = { workspace = true }

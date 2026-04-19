@@ -40,6 +40,11 @@ clean:
 run *args:
     cargo run {{args}}
 
+# Run with dynamic linking + hotpatching for fast iteration
+[group('run')]
+dev *args:
+    cargo run --features dev {{args}}
+
 # Watch for changes
 [group('run')]
 watch:
