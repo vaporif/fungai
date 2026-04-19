@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+hexx = "0.20"

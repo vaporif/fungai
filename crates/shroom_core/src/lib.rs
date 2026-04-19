@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use bevy::ecs::message::Message;
 use bevy::prelude::*;
 
+pub use hexx::{Hex, HexLayout, HexOrientation};
+
 pub struct CorePlugin;
 
 impl Plugin for CorePlugin {
@@ -28,28 +30,31 @@ impl Plugin for CorePlugin {
     }
 }
 
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
-pub struct GridPos(pub IVec2);
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GridPos(pub Hex);
 
 #[derive(Resource, Default, Debug, Clone, Reflect)]
 pub struct GridWorld {
-    pub tiles: HashMap<IVec2, Entity>,
+    #[reflect(ignore)]
+    pub tiles: HashMap<Hex, Entity>,
     pub width: i32,
     pub height: i32,
 }
 
 impl GridWorld {
-    pub fn neighbors(&self, pos: IVec2) -> impl Iterator<Item = (IVec2, Entity)> + '_ {
-        const DIRS: [IVec2; 4] = [
-            IVec2::new(1, 0),
-            IVec2::new(-1, 0),
-            IVec2::new(0, 1),
-            IVec2::new(0, -1),
-        ];
-        DIRS.iter().filter_map(move |&d| {
-            let neighbor = pos + d;
-            self.tiles.get(&neighbor).map(|&e| (neighbor, e))
-        })
+    pub fn neighbors(&self, pos: Hex) -> impl Iterator<Item = (Hex, Entity)> + '_ {
+        pos.all_neighbors()
+            .into_iter()
+            .filter_map(move |n| self.tiles.get(&n).map(|&e| (n, e)))
+    }
+}
+
+#[must_use]
+pub fn create_hex_layout() -> HexLayout {
+    HexLayout {
+        orientation: HexOrientation::Pointy,
+        origin: hexx::Vec2::ZERO,
+        scale: hexx::Vec2::splat(28.0),
     }
 }
 
@@ -274,13 +279,15 @@ pub struct FruitingBody {
     pub region_id: RegionId,
     pub fragment_id: FragmentId,
     pub progress: f32,
-    pub column_top: IVec2,
+    #[reflect(ignore)]
+    pub column_top: Hex,
 }
 
 #[derive(Component, Clone, Debug, Reflect)]
 pub struct MushroomEntity {
     pub fragment_id: FragmentId,
-    pub pos: IVec2,
+    #[reflect(ignore)]
+    pub pos: Hex,
     pub vision_radius: f32,
 }
 
@@ -330,19 +337,19 @@ pub struct TurnAdvanced;
 
 #[derive(Message)]
 pub struct TileDiscovered {
-    pub pos: IVec2,
+    pub pos: Hex,
     pub contents: Option<TileContents>,
 }
 
 #[derive(Message)]
 pub struct StudyComplete {
-    pub pos: IVec2,
+    pub pos: Hex,
     pub pool: UnlockPool,
 }
 
 #[derive(Message)]
 pub struct DecompositionComplete {
-    pub pos: IVec2,
+    pub pos: Hex,
 }
 
 #[derive(Message)]
@@ -557,5 +564,60 @@ mod tests {
     fn simulation_speed_is_paused() {
         assert!(SimulationSpeed::Paused.is_paused());
         assert!(!SimulationSpeed::Normal.is_paused());
+    }
+
+    #[test]
+    fn grid_pos_wraps_hex() {
+        let h = Hex::new(3, -2);
+        let gp = GridPos(h);
+        assert_eq!(gp.0, h);
+        assert_eq!(gp.0.x, 3);
+        assert_eq!(gp.0.y, -2);
+    }
+
+    #[test]
+    fn grid_world_neighbors_returns_six_when_all_exist() {
+        let mut world = GridWorld::default();
+        let center = Hex::ZERO;
+
+        // Insert center and all 6 neighbors
+        world.tiles.insert(center, Entity::from_bits(1));
+        for (i, neighbor) in center.all_neighbors().into_iter().enumerate() {
+            world
+                .tiles
+                .insert(neighbor, Entity::from_bits((i + 2) as u64));
+        }
+
+        let neighbors: Vec<_> = world.neighbors(center).collect();
+        assert_eq!(neighbors.len(), 6);
+
+        // Every returned position should be an actual hex neighbor of center
+        for (pos, _entity) in &neighbors {
+            assert!(center.all_neighbors().contains(pos));
+        }
+    }
+
+    #[test]
+    fn grid_world_neighbors_excludes_missing_tiles() {
+        let mut world = GridWorld::default();
+        let center = Hex::ZERO;
+        world.tiles.insert(center, Entity::from_bits(1));
+
+        // Insert only 2 of 6 neighbors
+        let all = center.all_neighbors();
+        world.tiles.insert(all[0], Entity::from_bits(2));
+        world.tiles.insert(all[3], Entity::from_bits(3));
+
+        let neighbors: Vec<_> = world.neighbors(center).collect();
+        assert_eq!(neighbors.len(), 2);
+    }
+
+    #[test]
+    fn hex_layout_coordinate_round_trip() {
+        let layout = create_hex_layout();
+        let original = Hex::new(5, -3);
+        let world_pos = layout.hex_to_world_pos(original);
+        let recovered = layout.world_pos_to_hex(world_pos);
+        assert_eq!(recovered, original);
     }
 }
