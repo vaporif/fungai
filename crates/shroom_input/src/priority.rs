@@ -1,10 +1,9 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use shroom_core::{GridPos, GridWorld, Tile};
+use shroom_core::{GridPos, GridWorld, HexLayout, Tile};
 
 use crate::camera::GameCamera;
 
-const TILE_SIZE: f32 = 48.0;
 const PRIORITY_RADIUS: i32 = 3;
 
 pub fn priority_system(
@@ -13,6 +12,7 @@ pub fn priority_system(
     camera_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     _grid: Res<GridWorld>,
     mut tiles: Query<(&GridPos, &mut Tile)>,
+    layout: Res<HexLayout>,
 ) {
     if !mouse.pressed(MouseButton::Right) {
         return;
@@ -31,15 +31,15 @@ pub fn priority_system(
         return;
     };
 
-    let grid_pos = IVec2::new(
-        (world_pos.x / TILE_SIZE).round() as i32,
-        (world_pos.y / TILE_SIZE).round() as i32,
-    );
+    let target_hex = layout.world_pos_to_hex(world_pos);
 
     for (gpos, mut tile) in &mut tiles {
-        let dist = (gpos.0 - grid_pos).abs();
-        if dist.x <= PRIORITY_RADIUS && dist.y <= PRIORITY_RADIUS {
-            let dir = (grid_pos - gpos.0).as_vec2();
+        let dist = gpos.0.distance_to(target_hex);
+        if dist <= PRIORITY_RADIUS {
+            // Direction vector in world space for the bias
+            let tile_world = layout.hex_to_world_pos(gpos.0);
+            let target_world = layout.hex_to_world_pos(target_hex);
+            let dir = target_world - tile_world;
             if dir.length_squared() > 0.01 {
                 tile.priority_bias = dir.normalize() * 0.5;
             }
@@ -49,7 +49,7 @@ pub fn priority_system(
 
 #[cfg(test)]
 mod tests {
-    use shroom_core::{GridPos, GridWorld, Tile};
+    use shroom_core::{create_hex_layout, GridPos, GridWorld, Hex, HexLayout, Tile};
 
     use bevy::prelude::*;
 
@@ -58,12 +58,13 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.init_resource::<GridWorld>();
+        app.insert_resource(create_hex_layout());
 
-        let pos = IVec2::new(5, 5);
+        let hex = Hex::new(5, -3);
         let entity = app
             .world_mut()
             .spawn((
-                GridPos(pos),
+                GridPos(hex),
                 Tile {
                     priority_bias: Vec2::ZERO,
                     ..Default::default()
@@ -73,17 +74,21 @@ mod tests {
         app.world_mut()
             .resource_mut::<GridWorld>()
             .tiles
-            .insert(pos, entity);
+            .insert(hex, entity);
 
         // Skip mouse input (needs a window), test bias math directly
         {
+            let layout = app.world().resource::<HexLayout>();
+            let target = Hex::new(8, -3);
+            let tile_world = layout.hex_to_world_pos(hex);
+            let target_world = layout.hex_to_world_pos(target);
+            let dir = (target_world - tile_world).normalize() * 0.5;
+
             let mut tile = app
                 .world_mut()
                 .get_mut::<Tile>(entity)
                 .expect("tile exists");
-            let target = IVec2::new(8, 5);
-            let dir = (target - pos).as_vec2();
-            tile.priority_bias = dir.normalize() * 0.5;
+            tile.priority_bias = dir;
         }
 
         let tile = app.world().get::<Tile>(entity).expect("tile exists");

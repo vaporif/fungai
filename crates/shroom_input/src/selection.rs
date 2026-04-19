@@ -4,12 +4,10 @@ use shroom_core::*;
 
 use crate::camera::GameCamera;
 
-const TILE_SIZE: f32 = 48.0;
-
 #[derive(Resource, Default)]
 pub struct SelectedRegion {
     pub region_id: Option<RegionId>,
-    pub selected_pos: Option<IVec2>,
+    pub selected_pos: Option<Hex>,
 }
 
 pub fn selection_system(
@@ -20,6 +18,7 @@ pub fn selection_system(
     tiles: Query<&Tile>,
     mut selected: ResMut<SelectedRegion>,
     ui_interactions: Query<&Interaction, With<Button>>,
+    layout: Res<HexLayout>,
 ) {
     if !mouse.just_pressed(MouseButton::Left) {
         return;
@@ -46,17 +45,14 @@ pub fn selection_system(
         return;
     };
 
-    let grid_pos = IVec2::new(
-        (world_pos.x / TILE_SIZE).round() as i32,
-        (world_pos.y / TILE_SIZE).round() as i32,
-    );
+    let hex = layout.world_pos_to_hex(world_pos);
 
-    let Some(&entity) = grid.tiles.get(&grid_pos) else {
+    let Some(&entity) = grid.tiles.get(&hex) else {
         return;
     };
 
     if let Ok(tile) = tiles.get(entity) {
-        selected.selected_pos = Some(grid_pos);
+        selected.selected_pos = Some(hex);
         selected.region_id = tile.occupant.region_id();
     }
 }

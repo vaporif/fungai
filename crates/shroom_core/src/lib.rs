@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use bevy::ecs::message::Message;
 use bevy::prelude::*;
 
-pub use hexx::{Hex, HexLayout, HexOrientation};
+pub use hexx::{Hex, HexLayout, HexOrientation, OffsetHexMode};
 
 pub struct CorePlugin;
 
 impl Plugin for CorePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GridWorld>()
+        app.insert_resource(create_hex_layout())
+            .init_resource::<GridWorld>()
             .init_resource::<RegionStates>()
             .init_resource::<GameState>()
             .init_resource::<TickTimer>()

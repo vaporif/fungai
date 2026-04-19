@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use bevy::ecs::message::MessageReader;
 use bevy::input::mouse::MouseWheel;
+use shroom_core::{Hex, HexLayout, HexOrientation, OffsetHexMode};
 
 #[derive(Component, Debug)]
 pub struct GameCamera;
@@ -11,12 +12,14 @@ const ZOOM_SPEED: f32 = 0.1;
 const MIN_ZOOM: f32 = 0.15;
 const MAX_ZOOM: f32 = 4.0;
 
-pub fn spawn_camera(mut commands: Commands) {
-    // Center on map midpoint (where the player starts)
+pub fn spawn_camera(mut commands: Commands, layout: Res<HexLayout>) {
+    let center_hex =
+        Hex::from_offset_coordinates([40, 30], OffsetHexMode::Odd, HexOrientation::Pointy);
+    let center = layout.hex_to_world_pos(center_hex);
     commands.spawn((
         Camera2d,
         GameCamera,
-        Transform::from_xyz(1920.0, 1440.0, 0.0),
+        Transform::from_xyz(center.x, center.y, 0.0),
     ));
 }
 
