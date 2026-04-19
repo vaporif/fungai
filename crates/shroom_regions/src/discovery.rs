@@ -31,16 +31,20 @@ pub fn explorer_discovery_system(
             .collect();
 
         for pos in positions {
-            if let Some(&entity) = grid.tiles.get(&pos) {
-                if let Ok(mut tile) = tiles.get_mut(entity) {
-                    if !tile.discovered {
-                        tile.discovered = true;
-                        discovered_messages.write(TileDiscovered {
-                            pos,
-                            contents: tile.contents,
-                        });
-                    }
-                }
+            let Some(&entity) = grid.tiles.get(&pos) else {
+                continue;
+            };
+
+            let Ok(mut tile) = tiles.get_mut(entity) else {
+                continue;
+            };
+
+            if !tile.discovered {
+                tile.discovered = true;
+                discovered_messages.write(TileDiscovered {
+                    pos,
+                    contents: tile.contents,
+                });
             }
         }
     }

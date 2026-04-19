@@ -34,6 +34,26 @@ pub struct RegionHulls {
     pub hulls: HashMap<RegionId, Vec<Vec2>>,
 }
 
+#[derive(Resource, Default, Debug)]
+pub struct DiscoveryMap {
+    /// Maps tile position to discovery level (0.0 = fully hidden, 1.0 = fully revealed).
+    /// Tiles near the network get higher values; tiles far away get lower values.
+    pub discovered: HashMap<IVec2, f32>,
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct RivalBranchGraph {
+    pub nodes: HashMap<IVec2, RivalBranchNode>,
+    pub edges: Vec<BranchEdge>,
+}
+
+#[derive(Debug)]
+pub struct RivalBranchNode {
+    pub pos: IVec2,
+    pub biomass: f32,
+    pub rival_id: RivalId,
+}
+
 pub fn extract_branch_graph(
     tiles: Query<(&GridPos, &Tile)>,
     grid: Res<GridWorld>,
@@ -133,6 +153,103 @@ pub fn extract_region_hulls(tiles: Query<(&GridPos, &Tile)>, mut hulls: ResMut<R
                 Vec2::new(min_x - 0.5, max_y + 0.5),
             ],
         );
+    }
+}
+
+pub fn extract_discovery_map(graph: Res<BranchGraph>, mut discovery: ResMut<DiscoveryMap>) {
+    discovery.discovered.clear();
+
+    let radius: i32 = 8;
+    let fully_hidden_threshold: f32 = 0.05;
+    let fully_visible_threshold: f32 = 0.3;
+
+    let mut influence_map: HashMap<IVec2, f32> = HashMap::new();
+
+    for &node_pos in graph.nodes.keys() {
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
+                let tile = node_pos + IVec2::new(dx, dy);
+
+                // Noise displacement using integer hash
+                let noise_x = (tile.x.wrapping_mul(73_856_093) ^ tile.y.wrapping_mul(19_349_663))
+                    as f32
+                    / (i32::MAX as f32);
+                let noise_y = (tile.x.wrapping_mul(19_349_663) ^ tile.y.wrapping_mul(73_856_093))
+                    as f32
+                    / (i32::MAX as f32);
+                let noise_offset = Vec2::new(noise_x, noise_y) * 1.5;
+
+                let displaced = tile.as_vec2() + noise_offset;
+                let dist = displaced.distance(node_pos.as_vec2());
+
+                if dist > radius as f32 {
+                    continue;
+                }
+
+                let influence = 1.0 / (dist * dist + 1.0);
+                *influence_map.entry(tile).or_default() += influence;
+            }
+        }
+    }
+
+    for (tile, influence) in &influence_map {
+        let discovered = if *influence <= fully_hidden_threshold {
+            0.0
+        } else if *influence >= fully_visible_threshold {
+            1.0
+        } else {
+            (*influence - fully_hidden_threshold)
+                / (fully_visible_threshold - fully_hidden_threshold)
+        };
+
+        if discovered > 0.0 {
+            discovery.discovered.insert(*tile, discovered);
+        }
+    }
+}
+
+pub fn extract_rival_branch_graph(
+    tiles: Query<(&GridPos, &Tile)>,
+    grid: Res<GridWorld>,
+    mut graph: ResMut<RivalBranchGraph>,
+) {
+    graph.nodes.clear();
+    graph.edges.clear();
+
+    for (gpos, tile) in tiles.iter() {
+        if let Occupant::Rival(rid) = tile.occupant {
+            graph.nodes.insert(
+                gpos.0,
+                RivalBranchNode {
+                    pos: gpos.0,
+                    biomass: tile.biomass,
+                    rival_id: rid,
+                },
+            );
+        }
+    }
+
+    let mut seen_edges: HashSet<(IVec2, IVec2)> = HashSet::default();
+    let node_keys: Vec<IVec2> = graph.nodes.keys().copied().collect();
+    for pos in node_keys {
+        for (npos, _) in grid.neighbors(pos) {
+            if graph.nodes.contains_key(&npos) {
+                let edge_key = if pos.x < npos.x || (pos.x == npos.x && pos.y < npos.y) {
+                    (pos, npos)
+                } else {
+                    (npos, pos)
+                };
+                if seen_edges.insert(edge_key) {
+                    let from_biomass = graph.nodes[&pos].biomass;
+                    let to_biomass = graph.nodes[&npos].biomass;
+                    graph.edges.push(BranchEdge {
+                        from: pos,
+                        to: npos,
+                        thickness: (from_biomass + to_biomass) * 0.5,
+                    });
+                }
+            }
+        }
     }
 }
 
@@ -239,5 +356,104 @@ mod tests {
         assert!(hulls.hulls.contains_key(&rid));
         let hull = &hulls.hulls[&rid];
         assert_eq!(hull.len(), 4); // bounding box has 4 corners
+    }
+
+    #[test]
+    fn discovery_map_inverse_square_gradient() {
+        let mut app = test_app();
+        app.init_resource::<DiscoveryMap>();
+
+        let rid = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+
+        let pos = IVec2::new(10, 10);
+        let e = app
+            .world_mut()
+            .spawn((
+                GridPos(pos),
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    biomass: 1.0,
+                    ..default()
+                },
+            ))
+            .id();
+        app.world_mut()
+            .resource_mut::<GridWorld>()
+            .tiles
+            .insert(pos, e);
+
+        app.add_systems(
+            Update,
+            (extract_branch_graph, extract_discovery_map).chain(),
+        );
+        app.update();
+
+        let discovery = app.world().resource::<DiscoveryMap>();
+
+        // Center tile: fully discovered
+        let center = discovery
+            .discovered
+            .get(&IVec2::new(10, 10))
+            .copied()
+            .unwrap_or(0.0);
+        assert_eq!(center, 1.0);
+
+        // Distance 2: partially discovered (inverse-square drops quickly)
+        let near = discovery
+            .discovered
+            .get(&IVec2::new(12, 10))
+            .copied()
+            .unwrap_or(0.0);
+        assert!(near > 0.0, "near tile should be discovered: {near}");
+
+        // Distance 7: barely discovered (near edge of radius 8)
+        let far = discovery
+            .discovered
+            .get(&IVec2::new(17, 10))
+            .copied()
+            .unwrap_or(0.0);
+        assert!(far < 0.5, "far tile should be dimly discovered: {far}");
+
+        // Distance 9: outside radius 8
+        assert!(
+            discovery.discovered.get(&IVec2::new(19, 10)).is_none(),
+            "tiles outside radius 8 should not be in the map"
+        );
+    }
+
+    #[test]
+    fn rival_branch_graph_extracts_rival_tiles() {
+        let mut app = test_app();
+        app.init_resource::<RivalBranchGraph>();
+
+        let rival_id = RivalId(0);
+        for x in 0..3 {
+            let pos = IVec2::new(x, 5);
+            let e = app
+                .world_mut()
+                .spawn((
+                    GridPos(pos),
+                    Tile {
+                        occupant: Occupant::Rival(rival_id),
+                        biomass: 1.0,
+                        ..default()
+                    },
+                ))
+                .id();
+            app.world_mut()
+                .resource_mut::<GridWorld>()
+                .tiles
+                .insert(pos, e);
+        }
+
+        app.add_systems(Update, extract_rival_branch_graph);
+        app.update();
+
+        let graph = app.world().resource::<RivalBranchGraph>();
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(graph.edges.len(), 2);
     }
 }

@@ -510,22 +510,16 @@ pub enum AbilityEffectType {
     DoubleStudySpeed,
 }
 
-// --- Neutral Fungi Merged (Task 2) ---
-
 #[derive(Message)]
 pub struct NeutralFungiMerged {
     pub fungus_id: u32,
     pub region_id: RegionId,
 }
 
-// --- Terrain Sprite Tracking (Task 2) ---
-
 #[derive(Resource, Default, Debug)]
 pub struct TerrainSpriteMap {
     pub sprites: HashMap<IVec2, Entity>,
 }
-
-// --- Organism Sprite Link (Task 2) ---
 
 #[derive(Component, Debug)]
 pub struct OrganismSpriteLink(pub Entity);

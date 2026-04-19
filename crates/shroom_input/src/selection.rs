@@ -43,10 +43,12 @@ pub fn selection_system(
         (world_pos.y / TILE_SIZE).round() as i32,
     );
 
-    if let Some(&entity) = grid.tiles.get(&grid_pos) {
-        if let Ok(tile) = tiles.get(entity) {
-            selected.selected_pos = Some(grid_pos);
-            selected.region_id = tile.occupant.region_id();
-        }
+    let Some(&entity) = grid.tiles.get(&grid_pos) else {
+        return;
+    };
+
+    if let Ok(tile) = tiles.get(entity) {
+        selected.selected_pos = Some(grid_pos);
+        selected.region_id = tile.occupant.region_id();
     }
 }

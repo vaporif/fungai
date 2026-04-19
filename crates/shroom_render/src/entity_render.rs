@@ -1,17 +1,23 @@
 use bevy::prelude::*;
 use shroom_core::{
-    FaunaAgent, FragmentAgent, GridPos, OrganismSpriteLink, PlantRootAgent, SpecializationType,
+    FaunaAgent, FragmentAgent, FruitingBody, GridPos, MushroomEntity, NeutralFungusAgent,
+    OrganismSpriteLink, PlantRootAgent, SpecializationType,
 };
 
+use crate::assets::EntitySprites;
 use crate::data_layer::TipPositions;
-
-const TILE_SIZE: f32 = 16.0;
+use crate::terrain_render::TILE_SIZE;
 
 #[derive(Component)]
 pub struct TipSprite;
 
 #[derive(Component)]
 pub struct OrganismSprite;
+
+#[must_use]
+pub fn organism_sprite_size() -> Vec2 {
+    Vec2::splat(TILE_SIZE * 0.7)
+}
 
 pub fn tip_render_system(
     mut commands: Commands,
@@ -37,7 +43,7 @@ pub fn tip_render_system(
             TipSprite,
             Sprite {
                 color,
-                custom_size: Some(Vec2::splat(TILE_SIZE * 0.6)),
+                custom_size: Some(Vec2::splat(TILE_SIZE * 0.4)),
                 ..default()
             },
             Transform::from_translation(world_pos),
@@ -45,12 +51,17 @@ pub fn tip_render_system(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn organism_render_system(
     mut commands: Commands,
+    sprites: Res<EntitySprites>,
     linked_sprites: Query<(Entity, &OrganismSpriteLink), With<OrganismSprite>>,
     fragments: Query<(Entity, &GridPos, &FragmentAgent), Without<OrganismSprite>>,
     plants: Query<(Entity, &GridPos, &PlantRootAgent), Without<OrganismSprite>>,
     fauna: Query<(Entity, &GridPos, &FaunaAgent), Without<OrganismSprite>>,
+    fruiting_bodies: Query<(Entity, &FruitingBody), Without<OrganismSprite>>,
+    mushrooms: Query<(Entity, &MushroomEntity), Without<OrganismSprite>>,
+    neutral_fungi: Query<(Entity, &GridPos, &NeutralFungusAgent), Without<OrganismSprite>>,
 ) {
     // Despawn sprites whose source entity no longer exists
     for (sprite_entity, link) in linked_sprites.iter() {
@@ -59,14 +70,17 @@ pub fn organism_render_system(
         }
     }
 
+    let size = organism_sprite_size();
+
     for (source, gpos, _fragment) in fragments.iter() {
         let world_pos = gpos.0.as_vec2() * TILE_SIZE;
         commands.spawn((
             OrganismSprite,
             OrganismSpriteLink(source),
             Sprite {
+                image: sprites.fragment.clone(),
                 color: Color::srgb(0.9, 0.7, 1.0),
-                custom_size: Some(Vec2::splat(TILE_SIZE * 0.8)),
+                custom_size: Some(size),
                 ..default()
             },
             Transform::from_translation(world_pos.extend(2.0)),
@@ -79,8 +93,9 @@ pub fn organism_render_system(
             OrganismSprite,
             OrganismSpriteLink(source),
             Sprite {
+                image: sprites.plant_root.clone(),
                 color: Color::srgb(0.2, 0.7, 0.3),
-                custom_size: Some(Vec2::splat(TILE_SIZE * 0.7)),
+                custom_size: Some(size),
                 ..default()
             },
             Transform::from_translation(world_pos.extend(2.0)),
@@ -93,11 +108,69 @@ pub fn organism_render_system(
             OrganismSprite,
             OrganismSpriteLink(source),
             Sprite {
+                image: sprites.fauna.clone(),
                 color: Color::srgb(0.7, 0.3, 0.2),
-                custom_size: Some(Vec2::splat(TILE_SIZE * 0.5)),
+                custom_size: Some(size),
                 ..default()
             },
             Transform::from_translation(world_pos.extend(2.0)),
         ));
+    }
+
+    for (source, body) in fruiting_bodies.iter() {
+        let world_pos = body.column_top.as_vec2() * TILE_SIZE;
+        commands.spawn((
+            OrganismSprite,
+            OrganismSpriteLink(source),
+            Sprite {
+                image: sprites.mushroom.clone(),
+                color: Color::WHITE,
+                custom_size: Some(size),
+                ..default()
+            },
+            Transform::from_translation(world_pos.extend(2.0)),
+        ));
+    }
+
+    for (source, mushroom) in mushrooms.iter() {
+        let world_pos = mushroom.pos.as_vec2() * TILE_SIZE;
+        commands.spawn((
+            OrganismSprite,
+            OrganismSpriteLink(source),
+            Sprite {
+                image: sprites.mushroom.clone(),
+                color: Color::WHITE,
+                custom_size: Some(size),
+                ..default()
+            },
+            Transform::from_translation(world_pos.extend(2.0)),
+        ));
+    }
+
+    for (source, gpos, _fungus) in neutral_fungi.iter() {
+        let world_pos = gpos.0.as_vec2() * TILE_SIZE;
+        commands.spawn((
+            OrganismSprite,
+            OrganismSpriteLink(source),
+            Sprite {
+                image: sprites.neutral_fungus.clone(),
+                color: Color::srgb(0.5, 0.6, 0.4),
+                custom_size: Some(size),
+                ..default()
+            },
+            Transform::from_translation(world_pos.extend(2.0)),
+        ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn organism_sprite_size_is_proportional_to_tile() {
+        let size = organism_sprite_size();
+        assert!(size.x >= 48.0 * 0.6);
+        assert!(size.x <= 48.0 * 0.75);
     }
 }
