@@ -6,4 +6,4 @@ license.workspace = true
 
 [dependencies]
 bevy = { workspace = true }
-hexx = "0.20"
+hexx = { version = "0.24", features = ["bevy"] }
