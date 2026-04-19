@@ -14,16 +14,20 @@ pub fn fragment_system(
             continue;
         }
 
-        if let Some(&entity) = grid.tiles.get(&gpos.0) {
-            if let Ok(tile) = tiles.get(entity) {
-                if tile.occupant.is_player() {
-                    fragment.fused = true;
-                    game_state.fragments_fused += 1;
-                    fused_messages.write(FragmentFused {
-                        fragment_id: fragment.fragment_id,
-                    });
-                }
-            }
+        let Some(&entity) = grid.tiles.get(&gpos.0) else {
+            continue;
+        };
+
+        let Ok(tile) = tiles.get(entity) else {
+            continue;
+        };
+
+        if tile.occupant.is_player() {
+            fragment.fused = true;
+            game_state.fragments_fused += 1;
+            fused_messages.write(FragmentFused {
+                fragment_id: fragment.fragment_id,
+            });
         }
     }
 }

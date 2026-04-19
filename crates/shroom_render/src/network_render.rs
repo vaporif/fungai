@@ -214,10 +214,6 @@ fn build_spline_mesh_inner(
     (mesh, points)
 }
 
-// ---------------------------------------------------------------------------
-// Step 1.2: Node degree computation
-// ---------------------------------------------------------------------------
-
 /// Count how many edges connect to each node for junction/leaf detection.
 #[cfg(test)]
 fn compute_node_degrees(graph: &BranchGraph) -> HashMap<IVec2, usize> {
@@ -228,10 +224,6 @@ fn compute_node_degrees(graph: &BranchGraph) -> HashMap<IVec2, usize> {
     }
     counts
 }
-
-// ---------------------------------------------------------------------------
-// Step 1.3: Grouping functions
-// ---------------------------------------------------------------------------
 
 /// Group player nodes by region, returning position and biomass pairs.
 #[must_use]
@@ -258,10 +250,6 @@ fn group_rival_nodes_by_id(graph: &RivalBranchGraph) -> HashMap<RivalId, Vec<(IV
     }
     groups
 }
-
-// ---------------------------------------------------------------------------
-// Step 1.4: Root picking and BFS
-// ---------------------------------------------------------------------------
 
 /// Pick the node closest to the centroid of the group as root.
 #[must_use]
@@ -314,10 +302,6 @@ fn bfs_edges(root: IVec2, node_set: &HashSet<IVec2>, edges: &[BranchEdge]) -> Ve
 
     result
 }
-
-// ---------------------------------------------------------------------------
-// Step 1.5: Decorative branch generation
-// ---------------------------------------------------------------------------
 
 /// Generate 0-2 short decorative sub-branches at a node, scaling with biomass.
 /// Each branch is returned as (start, end) in world coordinates.
@@ -375,10 +359,6 @@ fn generate_decorative_branches(
     branches
 }
 
-// ---------------------------------------------------------------------------
-// Step 1.6: Tip forking
-// ---------------------------------------------------------------------------
-
 /// Generate 2-3 daughter forks at a leaf tip node, splaying outward.
 #[must_use]
 fn generate_tip_forks(world_pos: Vec2, approach_dir: Vec2, seed: u32) -> Vec<(Vec2, Vec2)> {
@@ -414,13 +394,8 @@ fn generate_tip_forks(world_pos: Vec2, approach_dir: Vec2, seed: u32) -> Vec<(Ve
     forks
 }
 
-// ---------------------------------------------------------------------------
-// Step 1.7: Core geometry builder
-// ---------------------------------------------------------------------------
-
 /// Build all spline meshes for a branch tree from a set of nodes and edges.
 ///
-/// Returns a list of (mesh, centroid_offset) pairs. Each mesh is a single strand.
 /// `max_decorative` controls decorative sub-branch count (0 for rivals).
 /// `tip_fork` enables tip forking at degree-1 leaf nodes.
 #[must_use]
@@ -429,7 +404,7 @@ fn build_branch_tree(
     edges: &[BranchEdge],
     max_decorative: usize,
     tip_fork: bool,
-) -> Vec<(Mesh, Vec2)> {
+) -> Vec<Mesh> {
     if nodes.is_empty() {
         return Vec::new();
     }
@@ -439,14 +414,14 @@ fn build_branch_tree(
     let root = pick_root_node(nodes);
     let tree_edges = bfs_edges(root, &node_set, edges);
 
-    // Compute degrees on a local mini-graph for leaf detection
+    // Compute degrees on BFS tree edges (not original graph) for leaf detection
     let mut degrees: HashMap<IVec2, usize> = HashMap::new();
     for (parent, child) in &tree_edges {
         *degrees.entry(*parent).or_default() += 1;
         *degrees.entry(*child).or_default() += 1;
     }
 
-    let mut result: Vec<(Mesh, Vec2)> = Vec::new();
+    let mut result: Vec<Mesh> = Vec::new();
 
     for (idx, (parent, child)) in tree_edges.iter().enumerate() {
         let from_world = parent.as_vec2() * TILE_SIZE;
@@ -460,8 +435,7 @@ fn build_branch_tree(
                 .wrapping_add(strand as u32 * 73_856_093);
             let (mesh, _points) =
                 build_spline_mesh_with_wobble(from_world, to_world, STRAND_HALF_WIDTH, seed);
-            let center = (from_world + to_world) * 0.5;
-            result.push((mesh, center));
+            result.push(mesh);
         }
 
         // Decorative branches at child node
@@ -478,8 +452,7 @@ fn build_branch_tree(
                     STRAND_HALF_WIDTH * 0.7,
                     deco_seed.wrapping_add(42),
                 );
-                let center = (deco_start + deco_end) * 0.5;
-                result.push((mesh, center));
+                result.push(mesh);
             }
         }
 
@@ -498,8 +471,7 @@ fn build_branch_tree(
                         STRAND_HALF_WIDTH * 0.5,
                         fork_seed.wrapping_add(7),
                     );
-                    let center = (fork_start + fork_end) * 0.5;
-                    result.push((mesh, center));
+                    result.push(mesh);
                 }
             }
         }
@@ -507,10 +479,6 @@ fn build_branch_tree(
 
     result
 }
-
-// ---------------------------------------------------------------------------
-// Step 1.8: Render system
-// ---------------------------------------------------------------------------
 
 pub fn network_render_system(
     mut commands: Commands,
@@ -554,7 +522,7 @@ pub fn network_render_system(
 
         let tree_meshes = build_branch_tree(region_nodes, &graph.edges, 2, true);
 
-        for (mesh, _center) in tree_meshes {
+        for mesh in tree_meshes {
             commands.spawn((
                 BranchTreeMesh,
                 Mesh2d(meshes.add(mesh)),
@@ -589,7 +557,7 @@ pub fn network_render_system(
 
         let tree_meshes = build_branch_tree(rival_nodes, &rival_graph.edges, 0, false);
 
-        for (mesh, _center) in tree_meshes {
+        for mesh in tree_meshes {
             commands.spawn((
                 BranchTreeMesh,
                 Mesh2d(meshes.add(mesh)),

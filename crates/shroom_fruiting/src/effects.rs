@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use shroom_core::{
-    GridPos, MushroomEntity, Occupant, RegionStates, Tile, MUSHROOM_MOISTURE_BONUS,
-    MUSHROOM_MOISTURE_RADIUS,
+    GridPos, MUSHROOM_MOISTURE_BONUS, MUSHROOM_MOISTURE_RADIUS, MushroomEntity, Occupant,
+    RegionStates, Tile,
 };
 
 pub fn mushroom_effect_system(
@@ -18,17 +18,18 @@ pub fn mushroom_effect_system(
                 tile.moisture = (tile.moisture + MUSHROOM_MOISTURE_BONUS * 0.1).min(1.0);
             }
 
-            if bonus_region.is_none() && dist.x <= 3 && dist.y <= 3 {
-                if let Occupant::Player(rid) = tile.occupant {
-                    bonus_region = Some(rid);
-                }
+            if !(bonus_region.is_none() && dist.x <= 3 && dist.y <= 3) {
+                continue;
+            }
+
+            if let Occupant::Player(rid) = tile.occupant {
+                bonus_region = Some(rid);
             }
         }
 
-        if let Some(rid) = bonus_region {
-            if let Some(state) = region_states.get_mut(rid) {
-                state.nutrients += 1.0;
-            }
+        let Some(rid) = bonus_region else { continue };
+        if let Some(state) = region_states.get_mut(rid) {
+            state.nutrients += 1.0;
         }
     }
 }
