@@ -4,7 +4,7 @@ use shroom_core::*;
 
 use crate::camera::GameCamera;
 
-const TILE_SIZE: f32 = 16.0;
+const TILE_SIZE: f32 = 48.0;
 
 #[derive(Resource, Default)]
 pub struct SelectedRegion {
