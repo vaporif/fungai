@@ -57,13 +57,13 @@ pub fn nutrient_production_system(
         let organic = organic_per_region.get(rid).copied().unwrap_or(0);
 
         let base_production = match state.specialization {
-            Some(SpecializationType::Decomposer) => organic as f32 * 2.0 + tile_count as f32 * 0.1,
-            Some(SpecializationType::Symbiont) => tile_count as f32 * 0.5,
-            _ => tile_count as f32 * 0.05,
+            Some(SpecializationType::Decomposer) => organic as f32 * 2.0 + tile_count as f32 * 0.3,
+            Some(SpecializationType::Symbiont) => tile_count as f32 * 0.6,
+            _ => tile_count as f32 * 0.3,
         };
         let production = base_production * (1.0 + state.nutrient_bonus);
 
-        let consumption = tile_count as f32 * 0.2;
+        let consumption = tile_count as f32 * 0.15;
 
         state.nutrients += production - consumption;
         state.nutrients = state.nutrients.max(0.0);

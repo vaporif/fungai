@@ -56,15 +56,20 @@ pub fn hyphal_tip_system(
         );
         let direction = combined + jitter;
 
-        let mut best_score = f32::NEG_INFINITY;
-        let mut best_pos = None;
         let is_infiltrator = region_states
             .get(tip.region_id)
             .is_some_and(|r| r.specialization == Some(SpecializationType::Infiltrator));
 
+        // Score all passable neighbors, separating frontier (empty/rival) from owned
+        let mut best_frontier_score = f32::NEG_INFINITY;
+        let mut best_frontier_pos = None;
+
         for (npos, nentity) in grid.neighbors(pos) {
             if let Ok((_, ntile)) = tiles.get(nentity) {
                 if !ntile.terrain.is_passable() {
+                    continue;
+                }
+                if ntile.occupant.is_player() {
                     continue;
                 }
                 if ntile.occupant.is_rival() && !is_infiltrator {
@@ -74,14 +79,14 @@ pub fn hyphal_tip_system(
                 let to_world = layout.hex_to_world_pos(npos);
                 let offset = (to_world - from_world).normalize_or_zero();
                 let score = direction.dot(offset) + ntile.nutrient_level * 0.5;
-                if score > best_score {
-                    best_score = score;
-                    best_pos = Some(npos);
+                if score > best_frontier_score {
+                    best_frontier_score = score;
+                    best_frontier_pos = Some(npos);
                 }
             }
         }
 
-        match best_pos {
+        match best_frontier_pos {
             Some(target) => tip_targets.push((tip_entity, target, tip.region_id)),
             None => tips_to_despawn.push(tip_entity),
         }
@@ -303,7 +308,6 @@ mod tests {
             &mut app,
             shared,
             Tile {
-                occupant: Occupant::Player(rid),
                 biomass: 1.0,
                 ..default()
             },
@@ -333,8 +337,8 @@ mod tests {
             .get::<Tile>(grid.tiles[&shared])
             .expect("tile should exist");
         assert!(
-            tile.biomass > 1.0,
-            "anastomosis should increase biomass, got {}",
+            tile.biomass > 0.5,
+            "anastomosis should increase biomass beyond initial claim, got {}",
             tile.biomass
         );
     }

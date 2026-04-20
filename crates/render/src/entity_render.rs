@@ -35,6 +35,7 @@ pub fn tip_render_system(
 
     for (pos, spec) in &tip_positions.tips {
         let color = match spec {
+            Some(SpecializationType::Decomposer) => Color::srgb(0.4, 0.7, 0.3),
             Some(SpecializationType::Explorer) => Color::srgb(1.0, 0.9, 0.3),
             Some(SpecializationType::Parasite) => Color::srgb(0.8, 0.2, 0.2),
             Some(SpecializationType::Researcher) => Color::srgb(0.3, 0.5, 0.9),

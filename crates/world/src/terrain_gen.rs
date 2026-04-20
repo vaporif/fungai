@@ -1,12 +1,12 @@
 use bevy::prelude::*;
+use fungai_core::{
+    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HyphalTip,
+    NeutralFungusAgent, Occupant, PlantRootAgent, RegionStates, RivalId, SpecializationType,
+    TerrainType, Tile, TileContents,
+};
 use hexx::{Hex, HexOrientation, OffsetHexMode};
 use rand::prelude::*;
 use rand::rngs::StdRng;
-use fungai_core::{
-    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HyphalTip,
-    NeutralFungusAgent, Occupant, PlantRootAgent, RegionStates, RivalId, TerrainType, Tile,
-    TileContents,
-};
 
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 60;
@@ -168,6 +168,8 @@ pub fn terrain_generation(
     if let Some(state) = region_states.get_mut(player_rid) {
         state.nutrients = 100.0;
         state.energy = 20.0;
+        state.specialization = Some(SpecializationType::Decomposer);
+        state.target_specialization = Some(SpecializationType::Decomposer);
     }
     let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
     for hex in player_start.range(2) {
