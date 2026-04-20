@@ -71,7 +71,7 @@ pub fn spawn_title_card(mut commands: Commands) {
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("Shroom Shrooms"),
+                Text::new("Fungai"),
                 TextFont {
                     font_size: 64.0,
                     ..default()
