@@ -95,14 +95,8 @@ pub fn terrain_render_system(
         let base_color = terrain_base_color(tile.terrain);
         let t_index = terrain_type_index(tile.terrain);
 
-        // Deterministic jitter seeded by axial coordinates
-        let seed = (gpos.0.x.wrapping_mul(73_856_093)) ^ (gpos.0.y.wrapping_mul(19_349_663));
-        let jitter_x = ((seed & 0xFF) as f32 / 255.0 - 0.5) * 3.0;
-        let jitter_y = (((seed >> 8) & 0xFF) as f32 / 255.0 - 0.5) * 3.0;
-        let rotation = ((seed >> 16) & 0xFF) as f32 / 255.0 * 0.05 - 0.025;
-
         let base_pos = layout.hex_to_world_pos(gpos.0);
-        let world_pos = Vec3::new(base_pos.x + jitter_x, base_pos.y + jitter_y, 0.0);
+        let world_pos = Vec3::new(base_pos.x, base_pos.y, 0.0);
 
         let material = materials.add(TerrainMaterial {
             uniforms: TerrainUniforms {
@@ -122,8 +116,7 @@ pub fn terrain_render_system(
                 TerrainMeshTile { grid_pos: gpos.0 },
                 Mesh2d(meshes.add(build_hex_mesh(&layout))),
                 MeshMaterial2d(material),
-                Transform::from_translation(world_pos)
-                    .with_rotation(Quat::from_rotation_z(rotation)),
+                Transform::from_translation(world_pos).with_scale(Vec3::splat(1.01)),
             ))
             .id();
         sprite_map.sprites.insert(gpos.0, entity);
