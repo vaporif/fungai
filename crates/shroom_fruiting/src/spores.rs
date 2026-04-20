@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use rand::prelude::*;
 use rand::rngs::StdRng;
 use shroom_core::{
-    GridPos, GridWorld, HyphalTip, MushroomEntity, Occupant, RegionId, RegionStates, SporeAction,
-    Tile, SPORE_RELAY_ACCURACY_RADIUS,
+    GridPos, GridWorld, Hex, HyphalTip, MushroomEntity, Occupant, RegionId, RegionStates,
+    SporeAction, Tile, SPORE_RELAY_ACCURACY_RADIUS,
 };
 
 #[derive(Resource)]
@@ -64,10 +64,10 @@ pub fn spore_system(
     spore_action.cooldown_remaining = spore_action.cooldown_max;
 }
 
-fn find_owning_region(tiles: &Query<(&GridPos, &Tile)>, pos: IVec2) -> Option<RegionId> {
+fn find_owning_region(tiles: &Query<(&GridPos, &Tile)>, pos: Hex) -> Option<RegionId> {
     for (gpos, tile) in tiles.iter() {
-        let dist = (gpos.0 - pos).abs();
-        if dist.x <= 3 && dist.y <= 3 {
+        let dist = gpos.0.unsigned_distance_to(pos);
+        if dist <= 3 {
             if let Occupant::Player(rid) = tile.occupant {
                 return Some(rid);
             }
@@ -79,17 +79,16 @@ fn find_owning_region(tiles: &Query<(&GridPos, &Tile)>, pos: IVec2) -> Option<Re
 fn pick_spore_landing(
     _grid: &GridWorld,
     tiles: &Query<(&GridPos, &Tile)>,
-    origin: IVec2,
+    origin: Hex,
     rng: &mut StdRng,
-) -> Option<IVec2> {
-    let radius = SPORE_RELAY_ACCURACY_RADIUS;
+) -> Option<Hex> {
+    let radius = SPORE_RELAY_ACCURACY_RADIUS as u32;
 
-    let candidates: Vec<IVec2> = tiles
+    let candidates: Vec<Hex> = tiles
         .iter()
         .filter_map(|(gpos, tile)| {
-            let dist = (gpos.0 - origin).abs();
-            if dist.x <= radius
-                && dist.y <= radius
+            let dist = gpos.0.unsigned_distance_to(origin);
+            if dist <= radius
                 && tile.terrain.is_passable()
                 && !tile.occupant.is_player()
                 && !tile.occupant.is_rival()
@@ -124,13 +123,25 @@ mod tests {
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         let entity = app.world_mut().spawn((GridPos(pos), tile)).id();
         app.world_mut()
             .resource_mut::<GridWorld>()
             .tiles
             .insert(pos, entity);
         entity
+    }
+
+    /// Spawn a ring of hex tiles around `center` up to `radius` hex distance.
+    fn spawn_hex_area(app: &mut App, center: Hex, radius: u32, tile_fn: impl Fn(Hex) -> Tile) {
+        for q in -(radius as i32)..=(radius as i32) {
+            for r in -(radius as i32)..=(radius as i32) {
+                let h = Hex::new(center.x + q, center.y + r);
+                if h.unsigned_distance_to(center) <= radius {
+                    spawn_tile_at(app, h, tile_fn(h));
+                }
+            }
+        }
     }
 
     #[test]
@@ -142,31 +153,35 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
                 ..default()
             },
         );
 
-        for x in 3..=7 {
-            for y in 3..=7 {
-                if x == 5 && y == 5 {
-                    continue;
+        // Fill area around center with empty passable tiles
+        spawn_hex_area(&mut app, center, 3, |h| {
+            if h == center {
+                // Already spawned above, but spawn_tile_at will just overwrite the grid entry
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    ..default()
                 }
-                spawn_tile_at(&mut app, IVec2::new(x, y), Tile::default());
+            } else {
+                Tile::default()
             }
-        }
+        });
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: IVec2::new(5, 5),
+            pos: center,
             vision_radius: 10.0,
         });
 
-        // Trigger the spore action
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
 
         app.add_systems(Update, spore_system);
@@ -186,9 +201,9 @@ mod tests {
             .expect("should have exactly one hyphal tip");
         assert_eq!(tip.region_id, rid, "tip should belong to mushroom's region");
 
-        let dist = (tip_pos.0 - IVec2::new(5, 5)).abs();
+        let dist = tip_pos.0.unsigned_distance_to(center);
         assert!(
-            dist.x <= SPORE_RELAY_ACCURACY_RADIUS && dist.y <= SPORE_RELAY_ACCURACY_RADIUS,
+            dist <= SPORE_RELAY_ACCURACY_RADIUS as u32,
             "tip should land within spore accuracy radius"
         );
     }
@@ -202,38 +217,36 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
                 ..default()
             },
         );
 
-        for x in 3..=7 {
-            for y in 3..=7 {
-                if x == 5 && y == 5 {
-                    continue;
+        spawn_hex_area(&mut app, center, 3, |h| {
+            if h == center {
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    ..default()
                 }
-                spawn_tile_at(
-                    &mut app,
-                    IVec2::new(x, y),
-                    Tile {
-                        terrain: TerrainType::Rock,
-                        ..default()
-                    },
-                );
+            } else {
+                Tile {
+                    terrain: TerrainType::Rock,
+                    ..default()
+                }
             }
-        }
+        });
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: IVec2::new(5, 5),
+            pos: center,
             vision_radius: 10.0,
         });
 
-        // Trigger
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
 
         app.add_systems(Update, spore_system);
@@ -254,19 +267,15 @@ mod tests {
     fn spore_skips_mushroom_without_owning_region() {
         let mut app = test_app();
 
-        for x in 3..=7 {
-            for y in 3..=7 {
-                spawn_tile_at(&mut app, IVec2::new(x, y), Tile::default());
-            }
-        }
+        let center = Hex::new(5, 5);
+        spawn_hex_area(&mut app, center, 3, |_| Tile::default());
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: IVec2::new(5, 5),
+            pos: center,
             vision_radius: 10.0,
         });
 
-        // Trigger
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
 
         app.add_systems(Update, spore_system);
@@ -286,7 +295,7 @@ mod tests {
     #[test]
     fn no_crash_with_no_mushrooms() {
         let mut app = test_app();
-        spawn_tile_at(&mut app, IVec2::ZERO, Tile::default());
+        spawn_tile_at(&mut app, Hex::ZERO, Tile::default());
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
         app.add_systems(Update, spore_system);
         app.update();
@@ -301,27 +310,30 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
                 ..default()
             },
         );
 
-        for x in 3..=7 {
-            for y in 3..=7 {
-                if x == 5 && y == 5 {
-                    continue;
+        spawn_hex_area(&mut app, center, 3, |h| {
+            if h == center {
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    ..default()
                 }
-                spawn_tile_at(&mut app, IVec2::new(x, y), Tile::default());
+            } else {
+                Tile::default()
             }
-        }
+        });
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: IVec2::new(5, 5),
+            pos: center,
             vision_radius: 10.0,
         });
 
@@ -346,27 +358,30 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
                 ..default()
             },
         );
 
-        for x in 3..=7 {
-            for y in 3..=7 {
-                if x == 5 && y == 5 {
-                    continue;
+        spawn_hex_area(&mut app, center, 3, |h| {
+            if h == center {
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    ..default()
                 }
-                spawn_tile_at(&mut app, IVec2::new(x, y), Tile::default());
+            } else {
+                Tile::default()
             }
-        }
+        });
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: IVec2::new(5, 5),
+            pos: center,
             vision_radius: 10.0,
         });
 

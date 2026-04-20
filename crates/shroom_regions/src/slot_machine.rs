@@ -133,6 +133,8 @@ fn unlock_pool_options(pool: UnlockPool) -> Vec<UnlockOption> {
 
 #[cfg(test)]
 mod tests {
+    use shroom_core::Hex;
+
     use super::*;
 
     #[test]
@@ -162,7 +164,7 @@ mod tests {
         );
 
         app.world_mut().write_message(StudyComplete {
-            pos: IVec2::ZERO,
+            pos: Hex::ZERO,
             pool: UnlockPool::Organic,
         });
 

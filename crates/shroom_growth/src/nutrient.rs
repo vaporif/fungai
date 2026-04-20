@@ -3,8 +3,12 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use shroom_core::*;
 
-pub fn nutrient_gradient_system(mut tiles: Query<(&GridPos, &mut Tile)>, grid: Res<GridWorld>) {
-    let nutrient_map: HashMap<IVec2, f32> = tiles
+pub fn nutrient_gradient_system(
+    mut tiles: Query<(&GridPos, &mut Tile)>,
+    grid: Res<GridWorld>,
+    layout: Res<HexLayout>,
+) {
+    let nutrient_map: HashMap<Hex, f32> = tiles
         .iter()
         .map(|(gp, t)| (gp.0, t.nutrient_level))
         .collect();
@@ -13,11 +17,13 @@ pub fn nutrient_gradient_system(mut tiles: Query<(&GridPos, &mut Tile)>, grid: R
         let pos = gpos.0;
         let mut gradient = Vec2::ZERO;
         let my_nutrient = tile.nutrient_level;
+        let from_world = layout.hex_to_world_pos(pos);
 
         for (npos, _) in grid.neighbors(pos) {
             if let Some(&n_nutrient) = nutrient_map.get(&npos) {
                 let diff = n_nutrient - my_nutrient;
-                let dir = (npos - pos).as_vec2();
+                let to_world = layout.hex_to_world_pos(npos);
+                let dir = (to_world - from_world).normalize_or_zero();
                 gradient += dir * diff;
             }
         }
@@ -144,10 +150,11 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<GridWorld>();
         app.init_resource::<RegionStates>();
+        app.insert_resource(create_hex_layout());
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         let entity = app.world_mut().spawn((GridPos(pos), tile)).id();
         app.world_mut()
             .resource_mut::<GridWorld>()
@@ -160,9 +167,14 @@ mod tests {
     fn gradient_points_toward_higher_nutrients() {
         let mut app = test_app();
 
+        let center = Hex::new(5, 5);
+        let neighbors = center.all_neighbors();
+        // Place a high-nutrient tile at the first neighbor, low everywhere else
+        let rich_neighbor = neighbors[0];
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 nutrient_level: 0.1,
                 ..default()
@@ -170,36 +182,22 @@ mod tests {
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(6, 5),
+            rich_neighbor,
             Tile {
                 nutrient_level: 0.9,
                 ..default()
             },
         );
-        spawn_tile_at(
-            &mut app,
-            IVec2::new(4, 5),
-            Tile {
-                nutrient_level: 0.1,
-                ..default()
-            },
-        );
-        spawn_tile_at(
-            &mut app,
-            IVec2::new(5, 6),
-            Tile {
-                nutrient_level: 0.1,
-                ..default()
-            },
-        );
-        spawn_tile_at(
-            &mut app,
-            IVec2::new(5, 4),
-            Tile {
-                nutrient_level: 0.1,
-                ..default()
-            },
-        );
+        for &n in &neighbors[1..] {
+            spawn_tile_at(
+                &mut app,
+                n,
+                Tile {
+                    nutrient_level: 0.1,
+                    ..default()
+                },
+            );
+        }
 
         app.add_systems(Update, nutrient_gradient_system);
         app.update();
@@ -207,12 +205,17 @@ mod tests {
         let grid = app.world().resource::<GridWorld>();
         let tile = app
             .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(5, 5)])
+            .get::<Tile>(grid.tiles[&center])
             .expect("tile should exist");
+
+        // The gradient should point toward the rich neighbor in world space
+        let layout = app.world().resource::<HexLayout>();
+        let expected_dir =
+            (layout.hex_to_world_pos(rich_neighbor) - layout.hex_to_world_pos(center)).normalize();
+        let dot = tile.nutrient_gradient.dot(expected_dir);
         assert!(
-            tile.nutrient_gradient.x > 0.0,
-            "gradient x should be positive, got {}",
-            tile.nutrient_gradient.x
+            dot > 0.0,
+            "gradient should point toward higher nutrients, dot={dot}"
         );
     }
 
@@ -227,7 +230,7 @@ mod tests {
 
         spawn_tile_at(
             &mut app,
-            IVec2::new(0, 0),
+            Hex::ZERO,
             Tile {
                 occupant: Occupant::Player(rid),
                 contents: Some(TileContents::OrganicMatter),
@@ -258,9 +261,12 @@ mod tests {
             .expect("region exists")
             .specialization = Some(SpecializationType::Transporter);
 
+        // Place three tiles as hex neighbors so the transporter bridges them
+        let center = Hex::ZERO;
+        let neighbors = center.all_neighbors();
         spawn_tile_at(
             &mut app,
-            IVec2::new(0, 0),
+            neighbors[0],
             Tile {
                 occupant: Occupant::Player(rich_rid),
                 ..default()
@@ -268,7 +274,7 @@ mod tests {
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(1, 0),
+            center,
             Tile {
                 occupant: Occupant::Player(transport_rid),
                 ..default()
@@ -276,7 +282,7 @@ mod tests {
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(2, 0),
+            neighbors[1],
             Tile {
                 occupant: Occupant::Player(poor_rid),
                 ..default()

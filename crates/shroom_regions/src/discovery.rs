@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
 use shroom_core::{
-    DecompositionComplete, GridPos, GridWorld, HyphalTip, Occupant, RegionStates,
+    DecompositionComplete, GridPos, GridWorld, Hex, HyphalTip, Occupant, RegionStates,
     SlotMachineTriggered, SpecializationType, StudyComplete, Tile, TileContents, TileDiscovered,
     UnlockPool,
 };
@@ -26,7 +26,7 @@ pub fn explorer_discovery_system(
             continue;
         }
 
-        let positions: Vec<IVec2> = std::iter::once(gpos.0)
+        let positions: Vec<Hex> = std::iter::once(gpos.0)
             .chain(grid.neighbors(gpos.0).map(|(p, _)| p))
             .collect();
 
@@ -52,7 +52,7 @@ pub fn explorer_discovery_system(
 
 #[derive(Resource, Default, Debug, Clone, Reflect)]
 pub struct StudyProgress {
-    pub entries: HashMap<IVec2, f32>,
+    pub entries: HashMap<Hex, f32>,
 }
 
 pub fn researcher_study_system(
@@ -99,7 +99,7 @@ pub fn researcher_study_system(
 
 #[derive(Resource, Default, Debug, Clone, Reflect)]
 pub struct DecompProgress {
-    pub entries: HashMap<IVec2, f32>,
+    pub entries: HashMap<Hex, f32>,
 }
 
 pub fn decomposer_discovery_system(
@@ -163,7 +163,7 @@ mod tests {
         let rid = rs.create_region();
         rs.get_mut(rid).unwrap().specialization = Some(SpecializationType::Explorer);
 
-        let pos = IVec2::new(3, 3);
+        let pos = Hex::new(3, 3);
         let entity = app
             .world_mut()
             .spawn((
@@ -203,8 +203,8 @@ mod tests {
         let rid = rs.create_region();
         rs.get_mut(rid).unwrap().specialization = Some(SpecializationType::Researcher);
 
-        let pos = IVec2::new(5, 5);
-        let neighbor_pos = IVec2::new(6, 5);
+        let pos = Hex::new(5, 5);
+        let neighbor_pos = pos.all_neighbors()[0];
 
         let player_entity = app
             .world_mut()
@@ -258,7 +258,7 @@ mod tests {
         let rid = rs.create_region();
         rs.get_mut(rid).unwrap().specialization = Some(SpecializationType::Decomposer);
 
-        let pos = IVec2::new(2, 2);
+        let pos = Hex::new(2, 2);
         let entity = app
             .world_mut()
             .spawn((

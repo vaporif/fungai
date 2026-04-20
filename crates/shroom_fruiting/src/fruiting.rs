@@ -48,7 +48,7 @@ pub fn fruiting_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shroom_core::{FragmentId, GridWorld, RegionStates};
+    use shroom_core::{FragmentId, GridWorld, Hex, RegionStates};
 
     fn test_app() -> App {
         let mut app = App::new();
@@ -77,7 +77,7 @@ mod tests {
             region_id: rid,
             fragment_id: FragmentId(0),
             progress: 0.0,
-            column_top: IVec2::new(5, 10),
+            column_top: Hex::new(5, 10),
         });
 
         app.world_mut().spawn(FragmentAgent {
@@ -114,7 +114,7 @@ mod tests {
             region_id: rid,
             fragment_id: FragmentId(0),
             progress: 0.95,
-            column_top: IVec2::new(5, 10),
+            column_top: Hex::new(5, 10),
         });
         app.world_mut().spawn(FragmentAgent {
             fragment_id: FragmentId(0),

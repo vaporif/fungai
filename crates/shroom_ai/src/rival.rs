@@ -37,12 +37,12 @@ pub fn rival_ai_system(
 ) {
     let rid = rival_state.rival_id;
 
-    let tile_data: HashMap<IVec2, (Occupant, f32, TerrainType)> = tiles
+    let tile_data: HashMap<Hex, (Occupant, f32, TerrainType)> = tiles
         .iter()
         .map(|(gp, t)| (gp.0, (t.occupant, t.nutrient_level, t.terrain)))
         .collect();
 
-    let mut frontier: Vec<(IVec2, IVec2)> = Vec::new();
+    let mut frontier: Vec<(Hex, Hex)> = Vec::new();
     for (&pos, &(occupant, _nutrient, _terrain)) in &tile_data {
         if occupant != Occupant::Rival(rid) {
             continue;
@@ -100,7 +100,7 @@ mod tests {
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         let entity = app.world_mut().spawn((GridPos(pos), tile)).id();
         app.world_mut()
             .resource_mut::<GridWorld>()
@@ -114,9 +114,12 @@ mod tests {
         let mut app = test_app();
         let rid = RivalId(0);
 
+        let center = Hex::new(5, 5);
+        let neighbors = center.all_neighbors();
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Rival(rid),
                 biomass: 3.0,
@@ -124,19 +127,18 @@ mod tests {
                 ..default()
             },
         );
-        spawn_tile_at(&mut app, IVec2::new(6, 5), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(4, 5), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(5, 6), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(5, 4), Tile::default());
+        for &n in &neighbors {
+            spawn_tile_at(&mut app, n, Tile::default());
+        }
 
         app.add_systems(Update, rival_ai_system);
         app.update();
 
         let grid = app.world().resource::<GridWorld>();
-        let neighbors_occupied = [(6, 5), (4, 5), (5, 6), (5, 4)]
+        let neighbors_occupied = neighbors
             .iter()
-            .filter(|&&(x, y)| {
-                let e = grid.tiles[&IVec2::new(x, y)];
+            .filter(|n| {
+                let e = grid.tiles[n];
                 app.world().get::<Tile>(e).unwrap().occupant.is_rival()
             })
             .count();

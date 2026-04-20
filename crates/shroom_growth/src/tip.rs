@@ -20,9 +20,10 @@ pub fn hyphal_tip_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
     grid: Res<GridWorld>,
     region_states: Res<RegionStates>,
+    layout: Res<HexLayout>,
     mut rng: ResMut<GrowthRng>,
 ) {
-    let mut tip_targets: Vec<(Entity, IVec2, RegionId)> = Vec::new();
+    let mut tip_targets: Vec<(Entity, Hex, RegionId)> = Vec::new();
     let mut tips_to_despawn: Vec<Entity> = Vec::new();
 
     for (tip_entity, gpos, mut tip) in tips.iter_mut() {
@@ -69,7 +70,9 @@ pub fn hyphal_tip_system(
                 if ntile.occupant.is_rival() && !is_infiltrator {
                     continue;
                 }
-                let offset = (npos - pos).as_vec2();
+                let from_world = layout.hex_to_world_pos(pos);
+                let to_world = layout.hex_to_world_pos(npos);
+                let offset = (to_world - from_world).normalize_or_zero();
                 let score = direction.dot(offset) + ntile.nutrient_level * 0.5;
                 if score > best_score {
                     best_score = score;
@@ -84,7 +87,7 @@ pub fn hyphal_tip_system(
         }
     }
 
-    let mut claimed: HashSet<IVec2> = HashSet::new();
+    let mut claimed: HashSet<Hex> = HashSet::new();
     for (tip_entity, target, rid) in &tip_targets {
         if claimed.contains(target) {
             if let Some(&tentity) = grid.tiles.get(target)
@@ -131,7 +134,7 @@ mod tests {
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         let entity = app.world_mut().spawn((GridPos(pos), tile)).id();
         app.world_mut()
             .resource_mut::<GridWorld>()
@@ -143,28 +146,37 @@ mod tests {
     #[test]
     fn tip_moves_toward_nutrient_gradient() {
         let mut app = test_app();
+        let layout = create_hex_layout();
+        app.insert_resource(layout);
+
         let rid = app
             .world_mut()
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
+        let neighbors = center.all_neighbors();
+        // Pick a target neighbor and compute the world-space direction for the gradient
+        let target = neighbors[0];
+        let layout = app.world().resource::<HexLayout>();
+        let dir = (layout.hex_to_world_pos(target) - layout.hex_to_world_pos(center)).normalize();
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
-                nutrient_gradient: Vec2::new(1.0, 0.0),
+                nutrient_gradient: dir,
                 biomass: 1.0,
                 ..default()
             },
         );
-        spawn_tile_at(&mut app, IVec2::new(6, 5), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(4, 5), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(5, 6), Tile::default());
-        spawn_tile_at(&mut app, IVec2::new(5, 4), Tile::default());
+        for &n in &neighbors {
+            spawn_tile_at(&mut app, n, Tile::default());
+        }
 
         app.world_mut().spawn((
-            GridPos(IVec2::new(5, 5)),
+            GridPos(center),
             HyphalTip {
                 region_id: rid,
                 age: 0,
@@ -174,49 +186,47 @@ mod tests {
         app.add_systems(Update, hyphal_tip_system);
         app.update();
 
-        let tips: Vec<IVec2> = app
+        let tips: Vec<Hex> = app
             .world_mut()
             .query::<(&GridPos, &HyphalTip)>()
             .iter(app.world())
             .map(|(gp, _)| gp.0)
             .collect();
         assert_eq!(tips.len(), 1);
-        assert_eq!(tips[0], IVec2::new(6, 5));
+        assert_eq!(tips[0], target);
 
         let grid = app.world().resource::<GridWorld>();
-        let target = app
+        let target_tile = app
             .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(6, 5)])
+            .get::<Tile>(grid.tiles[&target])
             .expect("tile should exist");
-        assert!(target.occupant.is_player());
+        assert!(target_tile.occupant.is_player());
     }
 
     #[test]
     fn tip_dies_when_no_passable_neighbors() {
         let mut app = test_app();
+        app.insert_resource(create_hex_layout());
+
         let rid = app
             .world_mut()
             .resource_mut::<RegionStates>()
             .create_region();
 
+        let center = Hex::new(5, 5);
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(rid),
                 biomass: 1.0,
                 ..default()
             },
         );
-        for &dir in &[
-            IVec2::new(6, 5),
-            IVec2::new(4, 5),
-            IVec2::new(5, 6),
-            IVec2::new(5, 4),
-        ] {
+        for n in center.all_neighbors() {
             spawn_tile_at(
                 &mut app,
-                dir,
+                n,
                 Tile {
                     terrain: TerrainType::Rock,
                     ..default()
@@ -225,7 +235,7 @@ mod tests {
         }
 
         app.world_mut().spawn((
-            GridPos(IVec2::new(5, 5)),
+            GridPos(center),
             HyphalTip {
                 region_id: rid,
                 age: 0,
@@ -249,34 +259,49 @@ mod tests {
     #[test]
     fn tip_anastomosis_boosts_biomass() {
         let mut app = test_app();
+        let layout = create_hex_layout();
+        app.insert_resource(layout);
+
         let rid = app
             .world_mut()
             .resource_mut::<RegionStates>()
             .create_region();
 
+        // Two tips on opposite sides of a shared neighbor, both pointing toward it
+        let shared = Hex::new(5, 5);
+        let shared_neighbors = shared.all_neighbors();
+        let tip_a = shared_neighbors[0];
+        let tip_b = shared_neighbors[3]; // opposite side
+
+        let layout = app.world().resource::<HexLayout>();
+        let dir_a =
+            (layout.hex_to_world_pos(shared) - layout.hex_to_world_pos(tip_a)).normalize();
+        let dir_b =
+            (layout.hex_to_world_pos(shared) - layout.hex_to_world_pos(tip_b)).normalize();
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            tip_a,
             Tile {
                 occupant: Occupant::Player(rid),
-                nutrient_gradient: Vec2::new(1.0, 0.0),
+                nutrient_gradient: dir_a,
                 biomass: 2.0,
                 ..default()
             },
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(7, 5),
+            tip_b,
             Tile {
                 occupant: Occupant::Player(rid),
-                nutrient_gradient: Vec2::new(-1.0, 0.0),
+                nutrient_gradient: dir_b,
                 biomass: 2.0,
                 ..default()
             },
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(6, 5),
+            shared,
             Tile {
                 occupant: Occupant::Player(rid),
                 biomass: 1.0,
@@ -285,14 +310,14 @@ mod tests {
         );
 
         app.world_mut().spawn((
-            GridPos(IVec2::new(5, 5)),
+            GridPos(tip_a),
             HyphalTip {
                 region_id: rid,
                 age: 0,
             },
         ));
         app.world_mut().spawn((
-            GridPos(IVec2::new(7, 5)),
+            GridPos(tip_b),
             HyphalTip {
                 region_id: rid,
                 age: 0,
@@ -305,7 +330,7 @@ mod tests {
         let grid = app.world().resource::<GridWorld>();
         let tile = app
             .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(6, 5)])
+            .get::<Tile>(grid.tiles[&shared])
             .expect("tile should exist");
         assert!(
             tile.biomass > 1.0,

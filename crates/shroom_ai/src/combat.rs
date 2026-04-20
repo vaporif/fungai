@@ -8,12 +8,12 @@ pub fn combat_resolution_system(
     grid: Res<GridWorld>,
     region_states: Res<RegionStates>,
 ) {
-    let tile_data: HashMap<IVec2, (Occupant, f32)> = tiles
+    let tile_data: HashMap<Hex, (Occupant, f32)> = tiles
         .iter()
         .map(|(gp, t)| (gp.0, (t.occupant, t.biomass)))
         .collect();
 
-    let mut flips: Vec<(IVec2, Occupant)> = Vec::new();
+    let mut flips: Vec<(Hex, Occupant)> = Vec::new();
 
     for (&pos, &(occupant, biomass)) in &tile_data {
         if occupant == Occupant::Empty {
@@ -69,7 +69,7 @@ mod tests {
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         let entity = app.world_mut().spawn((GridPos(pos), tile)).id();
         app.world_mut()
             .resource_mut::<GridWorld>()
@@ -86,9 +86,12 @@ mod tests {
         rs.get_mut(player_rid).unwrap().biomass = 20.0;
         let rival_rid = RivalId(0);
 
+        let center = Hex::new(5, 5);
+        let neighbor = center.all_neighbors()[0];
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(player_rid),
                 biomass: 20.0,
@@ -97,7 +100,7 @@ mod tests {
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(6, 5),
+            neighbor,
             Tile {
                 occupant: Occupant::Rival(rival_rid),
                 biomass: 5.0,
@@ -111,7 +114,7 @@ mod tests {
         let grid = app.world().resource::<GridWorld>();
         let tile = app
             .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(6, 5)])
+            .get::<Tile>(grid.tiles[&neighbor])
             .unwrap();
         assert!(
             tile.occupant.is_player(),
@@ -126,9 +129,12 @@ mod tests {
         let mut rs = app.world_mut().resource_mut::<RegionStates>();
         let player_rid = rs.create_region();
 
+        let center = Hex::new(5, 5);
+        let neighbor = center.all_neighbors()[0];
+
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 5),
+            center,
             Tile {
                 occupant: Occupant::Player(player_rid),
                 biomass: 10.0,
@@ -137,7 +143,7 @@ mod tests {
         );
         spawn_tile_at(
             &mut app,
-            IVec2::new(6, 5),
+            neighbor,
             Tile {
                 occupant: Occupant::Rival(RivalId(0)),
                 biomass: 8.0,
@@ -151,7 +157,7 @@ mod tests {
         let grid = app.world().resource::<GridWorld>();
         let tile = app
             .world()
-            .get::<Tile>(grid.tiles[&IVec2::new(6, 5)])
+            .get::<Tile>(grid.tiles[&neighbor])
             .unwrap();
         assert!(
             tile.occupant.is_rival(),

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use shroom_core::{
-    GridPos, MUSHROOM_MOISTURE_BONUS, MUSHROOM_MOISTURE_RADIUS, MushroomEntity, Occupant,
-    RegionStates, Tile,
+    GridPos, MushroomEntity, Occupant, RegionStates, Tile, MUSHROOM_MOISTURE_BONUS,
+    MUSHROOM_MOISTURE_RADIUS,
 };
 
 pub fn mushroom_effect_system(
@@ -13,12 +13,12 @@ pub fn mushroom_effect_system(
         let mut bonus_region = None;
 
         for (gpos, mut tile) in tiles.iter_mut() {
-            let dist = (gpos.0 - mushroom.pos).abs();
-            if dist.x <= MUSHROOM_MOISTURE_RADIUS && dist.y <= MUSHROOM_MOISTURE_RADIUS {
+            let dist = gpos.0.unsigned_distance_to(mushroom.pos);
+            if dist <= MUSHROOM_MOISTURE_RADIUS as u32 {
                 tile.moisture = (tile.moisture + MUSHROOM_MOISTURE_BONUS * 0.1).min(1.0);
             }
 
-            if !(bonus_region.is_none() && dist.x <= 3 && dist.y <= 3) {
+            if !(bonus_region.is_none() && dist <= 3) {
                 continue;
             }
 
@@ -37,7 +37,7 @@ pub fn mushroom_effect_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shroom_core::{FragmentId, GridWorld, RegionStates};
+    use shroom_core::{FragmentId, GridWorld, Hex, RegionStates};
 
     fn test_app() -> App {
         let mut app = App::new();
@@ -47,7 +47,7 @@ mod tests {
         app
     }
 
-    fn spawn_tile_at(app: &mut App, pos: IVec2, tile: Tile) -> Entity {
+    fn spawn_tile_at(app: &mut App, pos: Hex, tile: Tile) -> Entity {
         app.world_mut().spawn((GridPos(pos), tile)).id()
     }
 
@@ -55,9 +55,11 @@ mod tests {
     fn mushroom_boosts_moisture_within_radius() {
         let mut app = test_app();
 
-        let near_pos = IVec2::new(3, 3);
-        let far_pos = IVec2::new(20, 20);
-        let mushroom_pos = IVec2::new(5, 5);
+        let mushroom_pos = Hex::new(5, 5);
+        // Hex distance 2 -- well within MUSHROOM_MOISTURE_RADIUS (5)
+        let near_pos = Hex::new(5, 3);
+        // Hex distance 30 -- far outside
+        let far_pos = Hex::new(20, 20);
 
         let near_entity = spawn_tile_at(
             &mut app,
@@ -115,10 +117,12 @@ mod tests {
             .expect("region")
             .nutrients;
 
-        let mushroom_pos = IVec2::new(5, 5);
+        let mushroom_pos = Hex::new(5, 5);
+        // Place a player tile at a hex neighbor (distance 1, within bonus radius of 3)
+        let neighbor = mushroom_pos.all_neighbors()[0];
         spawn_tile_at(
             &mut app,
-            IVec2::new(5, 6),
+            neighbor,
             Tile {
                 occupant: Occupant::Player(rid),
                 ..default()
@@ -150,7 +154,7 @@ mod tests {
     fn mushroom_moisture_caps_at_one() {
         let mut app = test_app();
 
-        let pos = IVec2::new(5, 5);
+        let pos = Hex::new(5, 5);
         let entity = spawn_tile_at(
             &mut app,
             pos,
@@ -180,7 +184,7 @@ mod tests {
     #[test]
     fn no_crash_with_no_mushrooms() {
         let mut app = test_app();
-        spawn_tile_at(&mut app, IVec2::ZERO, Tile::default());
+        spawn_tile_at(&mut app, Hex::ZERO, Tile::default());
         app.add_systems(Update, mushroom_effect_system);
         app.update();
     }

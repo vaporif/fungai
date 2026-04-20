@@ -2,6 +2,18 @@ use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
 use shroom_core::*;
 
+/// Pick the neighbor with the lowest world-space y (i.e. "downward").
+fn downward_neighbor(pos: Hex, layout: &HexLayout) -> Hex {
+    pos.all_neighbors()
+        .into_iter()
+        .min_by(|a, b| {
+            let ay = layout.hex_to_world_pos(*a).y;
+            let by = layout.hex_to_world_pos(*b).y;
+            ay.partial_cmp(&by).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or(pos)
+}
+
 pub fn neutral_fungi_system(
     mut commands: Commands,
     mut fungi: Query<(Entity, &GridPos, &mut NeutralFungusAgent)>,
@@ -91,6 +103,7 @@ pub fn fauna_system(
     mut tiles: Query<&mut Tile>,
     grid: Res<GridWorld>,
     region_states: Res<RegionStates>,
+    layout: Res<HexLayout>,
 ) {
     for (entity, mut gpos, agent) in fauna.iter_mut() {
         let pos = gpos.0;
@@ -118,8 +131,8 @@ pub fn fauna_system(
             tile.biomass = (tile.biomass - agent.damage_per_tick).max(0.0);
         }
 
-        let new_pos = pos + IVec2::new(0, -1);
-        if grid.tiles.contains_key(&new_pos) {
+        let new_pos = downward_neighbor(pos, &layout);
+        if new_pos != pos && grid.tiles.contains_key(&new_pos) {
             gpos.0 = new_pos;
         } else {
             commands.entity(entity).despawn();
@@ -173,6 +186,7 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<GridWorld>();
         app.init_resource::<RegionStates>();
+        app.insert_resource(create_hex_layout());
         app
     }
 
@@ -184,7 +198,9 @@ mod tests {
         rs.get_mut(rid).unwrap().specialization = Some(SpecializationType::Symbiont);
         rs.get_mut(rid).unwrap().nutrients = 20.0;
 
-        let pos = IVec2::new(5, 5);
+        let pos = Hex::new(5, 5);
+        let plant_pos = pos.all_neighbors()[0];
+
         let tile_e = app
             .world_mut()
             .spawn((
@@ -200,7 +216,6 @@ mod tests {
             .tiles
             .insert(pos, tile_e);
 
-        let plant_pos = IVec2::new(6, 5);
         let plant_tile = app
             .world_mut()
             .spawn((GridPos(plant_pos), Tile::default()))
@@ -239,7 +254,7 @@ mod tests {
         let rid = rs.create_region();
         rs.get_mut(rid).unwrap().specialization = Some(SpecializationType::Hunter);
 
-        let pos = IVec2::new(3, 3);
+        let pos = Hex::new(3, 3);
         let tile_e = app
             .world_mut()
             .spawn((
@@ -255,14 +270,17 @@ mod tests {
             .tiles
             .insert(pos, tile_e);
 
-        let below = app
+        // Put a tile at the downward neighbor so fauna has somewhere to go
+        let layout = app.world().resource::<HexLayout>().clone();
+        let below = downward_neighbor(pos, &layout);
+        let below_e = app
             .world_mut()
-            .spawn((GridPos(IVec2::new(3, 2)), Tile::default()))
+            .spawn((GridPos(below), Tile::default()))
             .id();
         app.world_mut()
             .resource_mut::<GridWorld>()
             .tiles
-            .insert(IVec2::new(3, 2), below);
+            .insert(below, below_e);
 
         app.world_mut().spawn((
             GridPos(pos),
@@ -286,7 +304,7 @@ mod tests {
     #[test]
     fn bacteria_drains_nutrients() {
         let mut app = test_app();
-        let pos = IVec2::new(2, 2);
+        let pos = Hex::new(2, 2);
         let tile_e = app
             .world_mut()
             .spawn((

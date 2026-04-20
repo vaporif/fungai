@@ -35,7 +35,7 @@ pub fn fragment_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shroom_core::{FragmentId, Occupant, RegionId};
+    use shroom_core::{FragmentId, Hex, Occupant, RegionId};
 
     #[test]
     fn fragment_fuses_when_player_occupies_tile() {
@@ -47,7 +47,7 @@ mod tests {
         app.add_systems(Update, fragment_system);
 
         let rid = RegionId(0);
-        let pos = IVec2::new(3, 3);
+        let pos = Hex::new(3, 3);
         let tile_entity = app
             .world_mut()
             .spawn((

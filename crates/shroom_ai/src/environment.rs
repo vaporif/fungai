@@ -21,7 +21,7 @@ pub fn environment_threat_system(
     if game_state.turn.is_multiple_of(45) {
         let x = rng.0.random_range(0..grid.width);
         let y = grid.height - 1;
-        let pos = IVec2::new(x, y);
+        let pos = Hex::new(x, y);
         if grid.tiles.contains_key(&pos) {
             commands.spawn((
                 GridPos(pos),

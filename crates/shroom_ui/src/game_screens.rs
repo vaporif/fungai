@@ -217,7 +217,7 @@ pub fn restart_button_system(
 mod tests {
     use bevy::ecs::system::RunSystemOnce;
 
-    use shroom_core::{GridPos, GridWorld, Occupant, RivalId, TerrainType};
+    use shroom_core::{GridPos, GridWorld, Hex, Occupant, RivalId, TerrainType};
 
     use super::*;
 
@@ -229,7 +229,7 @@ mod tests {
         world
     }
 
-    fn spawn_tile(world: &mut World, pos: IVec2, terrain: TerrainType, occupant: Occupant) {
+    fn spawn_tile(world: &mut World, pos: Hex, terrain: TerrainType, occupant: Occupant) {
         let entity = world
             .spawn((
                 GridPos(pos),
@@ -257,7 +257,7 @@ mod tests {
             } else {
                 Occupant::Empty
             };
-            spawn_tile(&mut world, IVec2::new(i, 0), TerrainType::Soil, occupant);
+            spawn_tile(&mut world, Hex::new(i, 0), TerrainType::Soil, occupant);
         }
 
         let _ = world.run_system_once(game_outcome_system);
@@ -278,7 +278,7 @@ mod tests {
             } else {
                 Occupant::Empty
             };
-            spawn_tile(&mut world, IVec2::new(i, 0), TerrainType::Soil, occupant);
+            spawn_tile(&mut world, Hex::new(i, 0), TerrainType::Soil, occupant);
         }
 
         let _ = world.run_system_once(game_outcome_system);
@@ -317,13 +317,13 @@ mod tests {
         // A few tiles, no rival majority
         spawn_tile(
             &mut world,
-            IVec2::new(0, 0),
+            Hex::new(0, 0),
             TerrainType::Soil,
             Occupant::Empty,
         );
         spawn_tile(
             &mut world,
-            IVec2::new(1, 0),
+            Hex::new(1, 0),
             TerrainType::Soil,
             Occupant::Rival(RivalId(0)),
         );

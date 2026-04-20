@@ -43,7 +43,7 @@ mod tests {
         let entity = app
             .world_mut()
             .spawn((
-                GridPos(IVec2::new(0, 0)),
+                GridPos(Hex::ZERO),
                 Tile {
                     occupant: Occupant::Player(rid),
                     biomass: 1.0,
@@ -72,7 +72,7 @@ mod tests {
         let entity = app
             .world_mut()
             .spawn((
-                GridPos(IVec2::new(0, 0)),
+                GridPos(Hex::ZERO),
                 Tile {
                     occupant: Occupant::Player(rid),
                     biomass: 0.05,
