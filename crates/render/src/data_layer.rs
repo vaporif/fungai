@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
-use hexx::Hex;
 use fungai_core::*;
+use hexx::Hex;
 
 #[derive(Resource, Default, Debug)]
 pub struct BranchGraph {
@@ -40,6 +40,11 @@ pub struct DiscoveryMap {
     /// Maps tile position to discovery level (0.0 = fully hidden, 1.0 = fully revealed).
     /// Tiles near the network get higher values; tiles far away get lower values.
     pub discovered: HashMap<Hex, f32>,
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct PriorityBiasMap {
+    pub biases: HashMap<Hex, Vec2>,
 }
 
 #[derive(Resource, Default, Debug)]
@@ -256,6 +261,18 @@ pub fn extract_rival_branch_graph(
                     });
                 }
             }
+        }
+    }
+}
+
+pub fn extract_priority_bias_map(
+    tiles: Query<(&GridPos, &Tile)>,
+    mut bias_map: ResMut<PriorityBiasMap>,
+) {
+    bias_map.biases.clear();
+    for (gpos, tile) in tiles.iter() {
+        if tile.priority_bias.length_squared() > 0.001 {
+            bias_map.biases.insert(gpos.0, tile.priority_bias);
         }
     }
 }

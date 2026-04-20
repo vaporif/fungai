@@ -8,7 +8,9 @@ mod entity_render;
 mod network_render;
 mod terrain_render;
 
-pub use data_layer::{BranchGraph, DiscoveryMap, RegionHulls, RivalBranchGraph, TipPositions};
+pub use data_layer::{
+    BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls, RivalBranchGraph, TipPositions,
+};
 pub use network_render::catmull_rom;
 
 pub struct RenderPlugin;
@@ -24,6 +26,7 @@ impl Plugin for RenderPlugin {
             .init_resource::<RegionHulls>()
             .init_resource::<data_layer::DiscoveryMap>()
             .init_resource::<data_layer::RivalBranchGraph>()
+            .init_resource::<data_layer::PriorityBiasMap>()
             .add_systems(
                 Update,
                 (
@@ -32,6 +35,7 @@ impl Plugin for RenderPlugin {
                     data_layer::extract_region_hulls,
                     data_layer::extract_discovery_map.after(data_layer::extract_branch_graph),
                     data_layer::extract_rival_branch_graph,
+                    data_layer::extract_priority_bias_map,
                 ),
             )
             .add_systems(
@@ -51,6 +55,7 @@ impl Plugin for RenderPlugin {
                     network_render::network_render_system,
                     entity_render::tip_render_system,
                     entity_render::organism_render_system,
+                    entity_render::priority_arrow_render_system,
                     atmosphere::update_vignette,
                     atmosphere::update_particles,
                 ),

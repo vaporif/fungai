@@ -5,7 +5,7 @@ use fungai_core::{
 };
 
 use crate::assets::EntitySprites;
-use crate::data_layer::TipPositions;
+use crate::data_layer::{PriorityBiasMap, TipPositions};
 
 #[derive(Component)]
 pub struct TipSprite;
@@ -166,6 +166,40 @@ pub fn organism_render_system(
                 ..default()
             },
             Transform::from_translation(world_pos.extend(2.0)),
+        ));
+    }
+}
+
+#[derive(Component)]
+pub struct PriorityArrowSprite;
+
+pub fn priority_arrow_render_system(
+    mut commands: Commands,
+    bias_map: Res<PriorityBiasMap>,
+    existing: Query<Entity, With<PriorityArrowSprite>>,
+    layout: Res<HexLayout>,
+) {
+    for entity in existing.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
+    let arrow_size = Vec2::new(inner_radius * 0.5, inner_radius * 0.15);
+
+    for (hex, bias) in &bias_map.biases {
+        let angle = bias.y.atan2(bias.x);
+        let base_pos = layout.hex_to_world_pos(*hex);
+        let offset = *bias * inner_radius * 0.3;
+        let world_pos = Vec3::new(base_pos.x + offset.x, base_pos.y + offset.y, 3.0);
+
+        commands.spawn((
+            PriorityArrowSprite,
+            Sprite {
+                color: Color::srgba(0.2, 1.0, 0.6, 0.6),
+                custom_size: Some(arrow_size),
+                ..default()
+            },
+            Transform::from_translation(world_pos).with_rotation(Quat::from_rotation_z(angle)),
         ));
     }
 }

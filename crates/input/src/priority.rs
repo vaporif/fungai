@@ -8,13 +8,14 @@ const PRIORITY_RADIUS: i32 = 3;
 
 pub fn priority_system(
     mouse: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     _grid: Res<GridWorld>,
     mut tiles: Query<(&GridPos, &mut Tile)>,
     layout: Res<HexLayout>,
 ) {
-    if !mouse.pressed(MouseButton::Right) {
+    if !mouse.pressed(MouseButton::Left) || !keyboard.pressed(KeyCode::ShiftLeft) {
         return;
     }
 

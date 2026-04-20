@@ -5,8 +5,8 @@ use bevy::{
     shader::ShaderRef,
     sprite_render::Material2d,
 };
-use hexx::PlaneMeshBuilder;
 use fungai_core::*;
+use hexx::PlaneMeshBuilder;
 
 /// Packed uniform struct -- matches the WGSL `TerrainUniforms` struct exactly.
 #[derive(ShaderType, Debug, Clone)]

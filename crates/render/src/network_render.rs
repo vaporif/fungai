@@ -9,8 +9,8 @@ use bevy::{
     shader::ShaderRef,
     sprite_render::{AlphaMode2d, Material2d},
 };
-use hexx::Hex;
 use fungai_core::{HexLayout, RegionId, RivalId};
+use hexx::Hex;
 
 use crate::data_layer::{BranchEdge, BranchGraph, RivalBranchGraph};
 
