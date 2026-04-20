@@ -27,6 +27,7 @@ impl Plugin for RenderPlugin {
             .init_resource::<data_layer::DiscoveryMap>()
             .init_resource::<data_layer::RivalBranchGraph>()
             .init_resource::<data_layer::PriorityBiasMap>()
+            .init_resource::<data_layer::SelectedRegionTiles>()
             .add_systems(
                 Update,
                 (
@@ -36,6 +37,7 @@ impl Plugin for RenderPlugin {
                     data_layer::extract_discovery_map.after(data_layer::extract_branch_graph),
                     data_layer::extract_rival_branch_graph,
                     data_layer::extract_priority_bias_map,
+                    data_layer::extract_selected_region_tiles,
                 ),
             )
             .add_systems(
@@ -56,6 +58,7 @@ impl Plugin for RenderPlugin {
                     entity_render::tip_render_system,
                     entity_render::organism_render_system,
                     entity_render::priority_arrow_render_system,
+                    entity_render::region_highlight_render_system,
                     atmosphere::update_vignette,
                     atmosphere::update_particles,
                 ),

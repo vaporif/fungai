@@ -4,12 +4,6 @@ use fungai_core::*;
 
 use crate::camera::GameCamera;
 
-#[derive(Resource, Default)]
-pub struct SelectedRegion {
-    pub region_id: Option<RegionId>,
-    pub selected_pos: Option<Hex>,
-}
-
 pub fn selection_system(
     mouse: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,

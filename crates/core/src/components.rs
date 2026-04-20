@@ -63,3 +63,9 @@ pub struct MushroomEntity {
 
 #[derive(Component, Debug)]
 pub struct OrganismSpriteLink(pub Entity);
+
+#[derive(Resource, Default)]
+pub struct SelectedRegion {
+    pub region_id: Option<RegionId>,
+    pub selected_pos: Option<Hex>,
+}

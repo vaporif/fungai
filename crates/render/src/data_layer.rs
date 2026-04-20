@@ -48,6 +48,11 @@ pub struct PriorityBiasMap {
 }
 
 #[derive(Resource, Default, Debug)]
+pub struct SelectedRegionTiles {
+    pub tiles: Vec<Hex>,
+}
+
+#[derive(Resource, Default, Debug)]
 pub struct RivalBranchGraph {
     pub nodes: HashMap<Hex, RivalBranchNode>,
     pub edges: Vec<BranchEdge>,
@@ -273,6 +278,21 @@ pub fn extract_priority_bias_map(
     for (gpos, tile) in tiles.iter() {
         if tile.priority_bias.length_squared() > 0.001 {
             bias_map.biases.insert(gpos.0, tile.priority_bias);
+        }
+    }
+}
+
+pub fn extract_selected_region_tiles(
+    tiles: Query<(&GridPos, &Tile)>,
+    selected: Res<SelectedRegion>,
+    mut selected_tiles: ResMut<SelectedRegionTiles>,
+) {
+    selected_tiles.tiles.clear();
+    if let Some(rid) = selected.region_id {
+        for (gpos, tile) in tiles.iter() {
+            if tile.occupant.region_id() == Some(rid) {
+                selected_tiles.tiles.push(gpos.0);
+            }
         }
     }
 }

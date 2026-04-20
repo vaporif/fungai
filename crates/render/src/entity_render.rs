@@ -5,7 +5,7 @@ use fungai_core::{
 };
 
 use crate::assets::EntitySprites;
-use crate::data_layer::{PriorityBiasMap, TipPositions};
+use crate::data_layer::{PriorityBiasMap, SelectedRegionTiles, TipPositions};
 
 #[derive(Component)]
 pub struct TipSprite;
@@ -200,6 +200,38 @@ pub fn priority_arrow_render_system(
                 ..default()
             },
             Transform::from_translation(world_pos).with_rotation(Quat::from_rotation_z(angle)),
+        ));
+    }
+}
+
+#[derive(Component)]
+pub struct RegionHighlightSprite;
+
+pub fn region_highlight_render_system(
+    mut commands: Commands,
+    selected_tiles: Res<SelectedRegionTiles>,
+    existing: Query<Entity, With<RegionHighlightSprite>>,
+    layout: Res<HexLayout>,
+) {
+    for entity in existing.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
+    let highlight_size = Vec2::splat(inner_radius * 2.0);
+
+    for hex in &selected_tiles.tiles {
+        let base_pos = layout.hex_to_world_pos(*hex);
+        let world_pos = Vec3::new(base_pos.x, base_pos.y, 0.5);
+
+        commands.spawn((
+            RegionHighlightSprite,
+            Sprite {
+                color: Color::srgba(1.0, 1.0, 1.0, 0.15),
+                custom_size: Some(highlight_size),
+                ..default()
+            },
+            Transform::from_translation(world_pos),
         ));
     }
 }

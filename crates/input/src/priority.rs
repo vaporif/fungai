@@ -15,7 +15,7 @@ pub fn priority_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
     layout: Res<HexLayout>,
 ) {
-    if !mouse.pressed(MouseButton::Left) || !keyboard.pressed(KeyCode::ShiftLeft) {
+    if !mouse.just_pressed(MouseButton::Left) || !keyboard.pressed(KeyCode::ShiftLeft) {
         return;
     }
 
@@ -34,10 +34,14 @@ pub fn priority_system(
 
     let target_hex = layout.world_pos_to_hex(world_pos);
 
+    // Clear all existing bias before setting new one
+    for (_gpos, mut tile) in &mut tiles {
+        tile.priority_bias = Vec2::ZERO;
+    }
+
     for (gpos, mut tile) in &mut tiles {
         let dist = gpos.0.distance_to(target_hex);
         if dist <= PRIORITY_RADIUS {
-            // Direction vector in world space for the bias
             let tile_world = layout.hex_to_world_pos(gpos.0);
             let target_world = layout.hex_to_world_pos(target_hex);
             let dir = target_world - tile_world;
