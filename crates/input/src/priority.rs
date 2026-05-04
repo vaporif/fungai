@@ -44,7 +44,7 @@ pub fn priority_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fungai_core::{create_hex_layout, GridPos, GridWorld, Hex, Tile};
+    use fungai_core::{GridPos, GridWorld, Hex, Tile, create_hex_layout};
 
     fn test_app() -> App {
         let mut app = App::new();
