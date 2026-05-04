@@ -67,8 +67,7 @@ pub fn terrain_generation(
         }
     }
 
-    // Pass 2: pick placements. random_soil_pos_pre_spawn filters by terrain via tile_data
-    // AND avoids hexes already claimed in `placements`.
+    // Pass 2: pick placements on soil hexes that aren't already claimed.
     let mut placements: HashMap<Hex, TileContents> = HashMap::new();
     let mut terrain_overrides: HashMap<Hex, TerrainType> = HashMap::new();
     let mut fragment_spawns: Vec<(Hex, FragmentId)> = Vec::new();
@@ -118,7 +117,7 @@ pub fn terrain_generation(
         bacteria_spawns.push(pos);
     }
 
-    // Player and rival start positions: derived deterministically, override entire Tile.
+    // Fixed player/rival starting positions.
     let player_rid = region_states.create_region();
     if let Some(state) = region_states.get_mut(player_rid) {
         state.nutrients = 100.0;
@@ -132,7 +131,7 @@ pub fn terrain_generation(
     let rival_start = offset_to_hex(MAP_WIDTH / 4, MAP_HEIGHT / 4);
     let rival_hexes: Vec<Hex> = rival_start.range(1).collect();
 
-    // Pass 3: spawn every tile in one go. Player/rival hexes get their full override.
+    // Pass 3: spawn every tile, applying player/rival overrides where set.
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
             let hex = offset_to_hex(x, y);
@@ -178,7 +177,7 @@ pub fn terrain_generation(
         }
     }
 
-    // Pass 4: spawn agent entities (these are separate entities, not tile components).
+    // Pass 4: spawn agent entities (separate from the tile entities above).
     for (pos, fid) in fragment_spawns {
         commands.spawn((
             GridPos(pos),
