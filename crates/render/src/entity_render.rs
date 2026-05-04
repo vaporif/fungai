@@ -64,9 +64,7 @@ pub fn tip_render_system(
     }
 }
 
-// One query per organism component is the cleanest expression of the
-// `Added<T>` reaction; collapsing them via `Or<...>` filters loses the
-// per-type sprite/colour selection that the body relies on.
+// One `Added<T>` query per organism so each component picks its own sprite/colour.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_organism_sprites(
     mut commands: Commands,
@@ -172,7 +170,7 @@ pub fn spawn_organism_sprites(
     }
 }
 
-// Each `RemovedComponents<T>` is a distinct system param; merging them is not possible.
+// One `RemovedComponents<T>` per organism — they can't be merged into one param.
 #[allow(clippy::too_many_arguments)]
 pub fn despawn_orphaned_organism_sprites(
     mut commands: Commands,
