@@ -1,2 +1,11 @@
-[build]
-rustflags = ["-Zshare-generics=y"]
+[target.aarch64-apple-darwin]
+rustflags = ["-Zshare-generics=y", "-Zunstable-options", "-Clinker-features=+lld"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-Zshare-generics=y", "-Zunstable-options", "-Clinker-features=+lld"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Zshare-generics=y", "-Zunstable-options", "-Clinker-features=+lld"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-Zshare-generics=y", "-Zunstable-options", "-Clinker-features=+lld"]
