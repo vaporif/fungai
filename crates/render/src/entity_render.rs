@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use fungai_core::{
     FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout, MushroomEntity,
@@ -29,6 +28,10 @@ pub fn tip_render_system(
     existing: Query<Entity, With<TipSprite>>,
     layout: Res<HexLayout>,
 ) {
+    if !tip_positions.is_changed() {
+        return;
+    }
+
     for entity in existing.iter() {
         commands.entity(entity).despawn();
     }
@@ -61,40 +64,24 @@ pub fn tip_render_system(
     }
 }
 
-#[derive(SystemParam)]
-pub struct OrganismQueries<'w, 's> {
-    linked_sprites: Query<'w, 's, (Entity, &'static OrganismSpriteLink), With<OrganismSprite>>,
-    fragments:
-        Query<'w, 's, (Entity, &'static GridPos, &'static FragmentAgent), Without<OrganismSprite>>,
-    plants:
-        Query<'w, 's, (Entity, &'static GridPos, &'static PlantRootAgent), Without<OrganismSprite>>,
-    fauna: Query<'w, 's, (Entity, &'static GridPos, &'static FaunaAgent), Without<OrganismSprite>>,
-    fruiting_bodies: Query<'w, 's, (Entity, &'static FruitingBody), Without<OrganismSprite>>,
-    mushrooms: Query<'w, 's, (Entity, &'static MushroomEntity), Without<OrganismSprite>>,
-    neutral_fungi: Query<
-        'w,
-        's,
-        (Entity, &'static GridPos, &'static NeutralFungusAgent),
-        Without<OrganismSprite>,
-    >,
-}
-
-pub fn organism_render_system(
+// One query per organism component is the cleanest expression of the
+// `Added<T>` reaction; collapsing them via `Or<...>` filters loses the
+// per-type sprite/colour selection that the body relies on.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_organism_sprites(
     mut commands: Commands,
     sprites: Res<EntitySprites>,
-    organisms: OrganismQueries,
     layout: Res<HexLayout>,
+    new_fragments: Query<(Entity, &GridPos), Added<FragmentAgent>>,
+    new_plants: Query<(Entity, &GridPos), Added<PlantRootAgent>>,
+    new_fauna: Query<(Entity, &GridPos), Added<FaunaAgent>>,
+    new_fruiting: Query<(Entity, &FruitingBody), Added<FruitingBody>>,
+    new_mushrooms: Query<(Entity, &MushroomEntity), Added<MushroomEntity>>,
+    new_neutral_fungi: Query<(Entity, &GridPos), Added<NeutralFungusAgent>>,
 ) {
-    // Despawn sprites whose source entity no longer exists
-    for (sprite_entity, link) in organisms.linked_sprites.iter() {
-        if commands.get_entity(link.0).is_err() {
-            commands.entity(sprite_entity).despawn();
-        }
-    }
-
     let size = organism_sprite_size(&layout);
 
-    for (source, gpos, _fragment) in organisms.fragments.iter() {
+    for (source, gpos) in new_fragments.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -109,7 +96,7 @@ pub fn organism_render_system(
         ));
     }
 
-    for (source, gpos, _plant) in organisms.plants.iter() {
+    for (source, gpos) in new_plants.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -124,7 +111,7 @@ pub fn organism_render_system(
         ));
     }
 
-    for (source, gpos, _fauna_agent) in organisms.fauna.iter() {
+    for (source, gpos) in new_fauna.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -139,7 +126,7 @@ pub fn organism_render_system(
         ));
     }
 
-    for (source, body) in organisms.fruiting_bodies.iter() {
+    for (source, body) in new_fruiting.iter() {
         let world_pos = layout.hex_to_world_pos(body.column_top);
         commands.spawn((
             OrganismSprite,
@@ -154,7 +141,7 @@ pub fn organism_render_system(
         ));
     }
 
-    for (source, mushroom) in organisms.mushrooms.iter() {
+    for (source, mushroom) in new_mushrooms.iter() {
         let world_pos = layout.hex_to_world_pos(mushroom.pos);
         commands.spawn((
             OrganismSprite,
@@ -169,7 +156,7 @@ pub fn organism_render_system(
         ));
     }
 
-    for (source, gpos, _fungus) in organisms.neutral_fungi.iter() {
+    for (source, gpos) in new_neutral_fungi.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -185,6 +172,36 @@ pub fn organism_render_system(
     }
 }
 
+// Each `RemovedComponents<T>` is a distinct system param; merging them is not possible.
+#[allow(clippy::too_many_arguments)]
+pub fn despawn_orphaned_organism_sprites(
+    mut commands: Commands,
+    mut removed_fragments: RemovedComponents<FragmentAgent>,
+    mut removed_plants: RemovedComponents<PlantRootAgent>,
+    mut removed_fauna: RemovedComponents<FaunaAgent>,
+    mut removed_fruiting: RemovedComponents<FruitingBody>,
+    mut removed_mushrooms: RemovedComponents<MushroomEntity>,
+    mut removed_neutral_fungi: RemovedComponents<NeutralFungusAgent>,
+    linked_sprites: Query<(Entity, &OrganismSpriteLink), With<OrganismSprite>>,
+) {
+    let mut removed: HashSet<Entity> = HashSet::new();
+    removed.extend(removed_fragments.read());
+    removed.extend(removed_plants.read());
+    removed.extend(removed_fauna.read());
+    removed.extend(removed_fruiting.read());
+    removed.extend(removed_mushrooms.read());
+    removed.extend(removed_neutral_fungi.read());
+
+    if removed.is_empty() {
+        return;
+    }
+    for (sprite, link) in linked_sprites.iter() {
+        if removed.contains(&link.0) {
+            commands.entity(sprite).despawn();
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct PriorityArrowSprite;
 
@@ -194,6 +211,10 @@ pub fn priority_arrow_render_system(
     existing: Query<Entity, With<PriorityArrowSprite>>,
     layout: Res<HexLayout>,
 ) {
+    if !bias_map.is_changed() {
+        return;
+    }
+
     for entity in existing.iter() {
         commands.entity(entity).despawn();
     }
@@ -279,6 +300,10 @@ pub fn region_highlight_render_system(
     mut materials: ResMut<Assets<ColorMaterial>>,
     layout: Res<HexLayout>,
 ) {
+    if !selected_tiles.is_changed() {
+        return;
+    }
+
     for entity in existing.iter() {
         commands.entity(entity).despawn();
     }
