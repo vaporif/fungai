@@ -353,33 +353,33 @@ Run: `git add -A && git commit -m "move SlotMachineTriggered from core to region
 - Edit: `crates/core/src/lib.rs` (remove `add_message::<NeutralFungiMerged>()` at `:44`)
 - Edit: `crates/ai/src/lib.rs` (add `add_message::<NeutralFungiMerged>()` to `AiPlugin::build`)
 
-- [ ] **Step 1: Map consumers**
+- [x] **Step 1: Map consumers**
 
 Run: `grep -rn "NeutralFungiMerged" /Users/vaporif/Repos/fungai/crates/ --include="*.rs"`
 Expected: only `core/messages.rs`, `core/lib.rs`, and `ai/organisms.rs`. If any other file shows up, the validator finding was incomplete — re-evaluate before continuing.
 
-- [ ] **Step 2: Move the message struct**
+- [x] **Step 2: Move the message struct**
 
 Cut `#[derive(Message)] pub struct NeutralFungiMerged { ... }` from `crates/core/src/messages.rs:41-45`. Paste into `crates/ai/src/organisms.rs` near the top, below the existing `use` block. The struct uses `RegionId`, which is already in scope through `use fungai_core::*;` at `organisms.rs:3`. Extend the existing `use bevy::ecs::message::MessageWriter;` at `organisms.rs:1` to also import `Message` (the derive needs the trait in scope).
 
-- [ ] **Step 3: Confirm the glob import still resolves**
+- [x] **Step 3: Confirm the glob import still resolves**
 
 `crates/ai/src/organisms.rs:3` is `use fungai_core::*;`. Once `NeutralFungiMerged` is removed from `fungai_core`, the glob no longer provides it, but the type now lives in this same file so it is in scope directly. No new `use` line is required. Spot-check by running `cargo check -p fungai_ai` after editing.
 
-- [ ] **Step 4: Register in `AiPlugin`**
+- [x] **Step 4: Register in `AiPlugin`**
 
 `crates/ai/src/lib.rs:70-92`: add `app.add_message::<NeutralFungiMerged>();` to `AiPlugin::build`. Step 1's grep should show no downstream listener; if so, no `pub use` is required (skip the re-export).
 
-- [ ] **Step 5: Remove from core's plugin**
+- [x] **Step 5: Remove from core's plugin**
 
 Delete `.add_message::<NeutralFungiMerged>()` from `crates/core/src/lib.rs:44`.
 
-- [ ] **Step 6: Verify build and tests**
+- [x] **Step 6: Verify build and tests**
 
 Run: `cargo check --workspace && cargo nextest run --workspace && cargo clippy --workspace --all-targets -- -D warnings`
 Expected: all clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run: `git add -A && git commit -m "move NeutralFungiMerged from core to ai"`
 

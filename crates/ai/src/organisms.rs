@@ -1,6 +1,12 @@
-use bevy::ecs::message::MessageWriter;
+use bevy::ecs::message::{Message, MessageWriter};
 use bevy::prelude::*;
 use fungai_core::*;
+
+#[derive(Message)]
+pub struct NeutralFungiMerged {
+    pub fungus_id: u32,
+    pub region_id: RegionId,
+}
 
 /// Pick the neighbor with the lowest world-space y (i.e. "downward").
 fn downward_neighbor(pos: Hex, layout: &HexLayout) -> Hex {

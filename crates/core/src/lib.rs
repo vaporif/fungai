@@ -34,8 +34,7 @@ impl Plugin for CorePlugin {
             .add_message::<TileDiscovered>()
             .add_message::<StudyComplete>()
             .add_message::<DecompositionComplete>()
-            .add_message::<FragmentFused>()
-            .add_message::<NeutralFungiMerged>();
+            .add_message::<FragmentFused>();
     }
 }
 
