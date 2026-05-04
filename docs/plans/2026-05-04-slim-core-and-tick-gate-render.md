@@ -300,20 +300,20 @@ Run: `git add -A && git commit -m "move TerrainSpriteMap from core to render"`
 - Edit: `crates/ui/Cargo.toml` (add `fungai_regions = { workspace = true }` if Task 1 has not already added it)
 - Edit: `crates/ui/src/slot_machine_ui.rs` (switch the `SlotMachineTriggered` import to `fungai_regions`)
 
-- [ ] **Step 1: Map consumers**
+- [x] **Step 1: Map consumers**
 
 Run: `grep -rn "SlotMachineTriggered" /Users/vaporif/Repos/fungai/crates/ --include="*.rs"`
 Expected: `core/messages.rs:36`, `core/lib.rs:43`, several files in `regions/` (`slot_machine.rs`, `mutation.rs`, `discovery.rs`), and `ui/slot_machine_ui.rs`.
 
-- [ ] **Step 2: Move the message struct**
+- [x] **Step 2: Move the message struct**
 
 Cut `#[derive(Message)] pub struct SlotMachineTriggered { ... }` from `crates/core/src/messages.rs:35-39`. Paste into `crates/regions/src/slot_machine.rs` near the top, below existing imports. The struct uses `UnlockPool` (still in `fungai_core`) and `Vec<UnlockOption>` (also still in `fungai_core`); the existing `use fungai_core::{..., UnlockOption, UnlockPool};` already covers these. Extend the existing `use bevy::ecs::message::{MessageReader, MessageWriter};` at `slot_machine.rs:1` to also import `Message` (the derive needs the trait in scope).
 
-- [ ] **Step 3: Register in `RegionsPlugin`**
+- [x] **Step 3: Register in `RegionsPlugin`**
 
 `crates/regions/src/lib.rs`: in `RegionsPlugin::build` (lines 81-102), add `app.add_message::<SlotMachineTriggered>();` (it is fine to register here — `RegionsPlugin` is composed once by the binary). Update the existing `pub use slot_machine::{SlotMachineRng, slot_machine_system};` at `:17` to also re-export `SlotMachineTriggered`.
 
-- [ ] **Step 4: Drop the now-self-imports inside `regions/`**
+- [x] **Step 4: Drop the now-self-imports inside `regions/`**
 
 Three regions files import `SlotMachineTriggered` from `fungai_core`:
 - `crates/regions/src/slot_machine.rs:3`
@@ -322,24 +322,24 @@ Three regions files import `SlotMachineTriggered` from `fungai_core`:
 
 Remove `SlotMachineTriggered` from each of those `use fungai_core::{ ... };` blocks. The type is now in scope via `crate::slot_machine::SlotMachineTriggered` (or via a `use crate::slot_machine::SlotMachineTriggered;` line at the top of each consumer if a bare name is preferred).
 
-- [ ] **Step 5: Remove from core's plugin**
+- [x] **Step 5: Remove from core's plugin**
 
 Delete `.add_message::<SlotMachineTriggered>()` from `crates/core/src/lib.rs:43`.
 
-- [ ] **Step 6: Ensure `ui/` depends on `regions/`**
+- [x] **Step 6: Ensure `ui/` depends on `regions/`**
 
 If Task 1 already added `fungai_regions = { workspace = true }` to `crates/ui/Cargo.toml`, skip this step. Otherwise add it now.
 
-- [ ] **Step 7: Update the UI consumer**
+- [x] **Step 7: Update the UI consumer**
 
 In `crates/ui/src/slot_machine_ui.rs:2`, peel `SlotMachineTriggered` out of the `use fungai_core::{ ... };` line and import it from `fungai_regions` instead.
 
-- [ ] **Step 8: Verify build and tests**
+- [x] **Step 8: Verify build and tests**
 
 Run: `cargo check --workspace && cargo nextest run --workspace && cargo clippy --workspace --all-targets -- -D warnings`
 Expected: all clean.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run: `git add -A && git commit -m "move SlotMachineTriggered from core to regions"`
 
