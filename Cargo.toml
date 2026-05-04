@@ -11,7 +11,9 @@ license = "MIT"
 
 [workspace.dependencies]
 bevy = "0.18"
-rand = "0.9"
+rand = "0.10"
+hexx = { version = "0.24", features = ["bevy"] }
+
 fungai_core = { path = "crates/core" }
 fungai_world = { path = "crates/world" }
 fungai_growth = { path = "crates/growth" }

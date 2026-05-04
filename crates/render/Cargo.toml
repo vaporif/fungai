@@ -6,5 +6,5 @@ license.workspace = true
 
 [dependencies]
 bevy = { workspace = true }
-hexx = { version = "0.24", features = ["bevy"] }
+hexx = { workspace = true }
 fungai_core = { workspace = true }
