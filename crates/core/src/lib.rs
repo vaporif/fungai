@@ -29,7 +29,6 @@ impl Plugin for CorePlugin {
             .init_resource::<TickTimer>()
             .init_resource::<SimulationSpeed>()
             .init_resource::<GamePhase>()
-            .init_resource::<ActiveAbilityEffects>()
             .init_resource::<TerrainSpriteMap>()
             .init_resource::<HintsVisible>()
             .init_resource::<SelectedRegion>()

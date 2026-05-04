@@ -189,29 +189,29 @@ Run: `git add -A && git commit -m "move SporeAction from core to fruiting"`
 - Edit: `crates/core/src/lib.rs` (remove `init_resource::<ActiveAbilityEffects>()` at `:34`)
 - Edit: `crates/ui/src/lib.rs` (register the resource in `UiPlugin::build` and re-export)
 
-- [ ] **Step 1: Map consumers**
+- [x] **Step 1: Map consumers**
 
 Run: `grep -rn "ActiveAbilityEffects" /Users/vaporif/Repos/fungai/crates/ --include="*.rs"`
 Expected: only `core/abilities.rs`, `core/lib.rs`, `ui/ability_bar.rs`. If anything else hits, stop and reassess.
 
-- [ ] **Step 2: Move the struct definition**
+- [x] **Step 2: Move the struct definition**
 
 Cut `pub struct ActiveAbilityEffects { ... }` (it derives `Default`, so no separate impl) from `crates/core/src/abilities.rs:50-53`. Paste into `crates/ui/src/ability_bar.rs` near the top, below the existing imports. Then drop `ActiveAbilityEffects` from the `use fungai_core::{ ... };` block at `ability_bar.rs:3-6` — the type now lives in this same file. `AbilityEffectType` and `ActiveEffect` stay in `fungai_core` (they remain referenced by the moved struct via the still-present `fungai_core` import).
 
-- [ ] **Step 3: Register in `UiPlugin`**
+- [x] **Step 3: Register in `UiPlugin`**
 
 Open `crates/ui/src/lib.rs`. `UiPlugin::build` (lines 87-99) currently only adds sub-plugins; pick `AbilityBarPlugin` (lines 28-41) as the natural home and add `.init_resource::<ActiveAbilityEffects>()` to its build chain. No new `use` line is needed inside `lib.rs` (the resource type is referenced only inside `ability_bar.rs`'s submodule). Add `pub use ability_bar::ActiveAbilityEffects;` to the existing `pub use ability_bar::{...};` block at `:9-12` for downstream visibility.
 
-- [ ] **Step 4: Remove from core**
+- [x] **Step 4: Remove from core**
 
 Delete `.init_resource::<ActiveAbilityEffects>()` from `crates/core/src/lib.rs:34`. Confirm `crates/core/src/abilities.rs` no longer holds the struct.
 
-- [ ] **Step 5: Verify build and tests**
+- [x] **Step 5: Verify build and tests**
 
 Run: `cargo check --workspace && cargo nextest run --workspace && cargo clippy --workspace --all-targets -- -D warnings`
 Expected: all clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run: `git add -A && git commit -m "move ActiveAbilityEffects from core to ui"`
 

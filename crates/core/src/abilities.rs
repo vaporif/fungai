@@ -25,11 +25,6 @@ pub struct UnlockOption {
     pub pool: UnlockPool,
 }
 
-#[derive(Resource, Default, Debug, Clone, Reflect)]
-pub struct ActiveAbilityEffects {
-    pub effects: Vec<ActiveEffect>,
-}
-
 #[derive(Debug, Clone, Reflect)]
 pub struct ActiveEffect {
     pub region_id: RegionId,
