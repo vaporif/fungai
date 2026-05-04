@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use fungai_core::{MutationSelection, SlotMachineTriggered, UnlockOption};
+use fungai_core::{SlotMachineTriggered, UnlockOption};
+use fungai_regions::MutationSelection;
 
 #[derive(Component)]
 pub struct SlotMachinePanel;

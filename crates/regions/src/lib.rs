@@ -13,7 +13,7 @@ pub use discovery::{
     researcher_study_system,
 };
 pub use fragment::fragment_system;
-pub use mutation::{AppliedMutations, mutation_system};
+pub use mutation::{AppliedMutations, MutationSelection, mutation_system};
 pub use slot_machine::{SlotMachineRng, slot_machine_system};
 pub use specialization::specialization_system;
 
@@ -61,6 +61,7 @@ impl Plugin for UnlockPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SlotMachineRng>()
             .init_resource::<AppliedMutations>()
+            .init_resource::<MutationSelection>()
             .add_systems(
                 Update,
                 (slot_machine_system, mutation_system)

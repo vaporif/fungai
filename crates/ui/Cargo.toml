@@ -8,3 +8,4 @@ license-file.workspace = true
 bevy = { workspace = true }
 fungai_core = { workspace = true }
 fungai_input = { workspace = true }
+fungai_regions = { workspace = true }

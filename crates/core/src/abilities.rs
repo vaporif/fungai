@@ -25,11 +25,6 @@ pub struct UnlockOption {
     pub pool: UnlockPool,
 }
 
-#[derive(Resource, Default, Debug, Clone, Reflect)]
-pub struct MutationSelection {
-    pub selected_index: Option<usize>,
-}
-
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct SporeAction {
     pub cooldown_remaining: u32,
