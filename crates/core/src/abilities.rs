@@ -25,23 +25,6 @@ pub struct UnlockOption {
     pub pool: UnlockPool,
 }
 
-#[derive(Resource, Debug, Clone, Reflect)]
-pub struct SporeAction {
-    pub cooldown_remaining: u32,
-    pub cooldown_max: u32,
-    pub triggered: bool,
-}
-
-impl Default for SporeAction {
-    fn default() -> Self {
-        Self {
-            cooldown_remaining: 0,
-            cooldown_max: 10,
-            triggered: false,
-        }
-    }
-}
-
 #[derive(Resource, Default, Debug, Clone, Reflect)]
 pub struct ActiveAbilityEffects {
     pub effects: Vec<ActiveEffect>,

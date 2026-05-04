@@ -7,5 +7,6 @@ license-file.workspace = true
 [dependencies]
 bevy = { workspace = true }
 fungai_core = { workspace = true }
+fungai_fruiting = { workspace = true }
 fungai_input = { workspace = true }
 fungai_regions = { workspace = true }

@@ -2730,6 +2730,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "fungai_core",
+ "fungai_fruiting",
  "fungai_input",
  "fungai_regions",
 ]

@@ -2,8 +2,9 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use fungai_core::{
     AbilityEffectType, ActiveAbilityEffects, ActiveEffect, MushroomEntity, RegionStates,
-    SpecializationType, SporeAction,
+    SpecializationType,
 };
+use fungai_fruiting::SporeAction;
 use fungai_input::SelectedRegion;
 
 #[derive(Component)]

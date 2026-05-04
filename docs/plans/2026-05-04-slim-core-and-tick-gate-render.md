@@ -137,45 +137,45 @@ Run: `git add -A && git commit -m "move MutationSelection from core to regions"`
 - Edit: `crates/ui/Cargo.toml` (add `fungai_fruiting = { workspace = true }` — `ui/` does not yet depend on `fruiting/`)
 - Edit: `crates/ui/src/ability_bar.rs` (switch the `SporeAction` import to `fungai_fruiting`)
 
-- [ ] **Step 1: Map consumers**
+- [x] **Step 1: Map consumers**
 
 Run: `grep -rn "SporeAction" /Users/vaporif/Repos/fungai/crates/ --include="*.rs"`
 Expected: hits in `crates/core/src/abilities.rs`, `crates/core/src/lib.rs`, `crates/fruiting/src/spores.rs` (use line + test-only inits/uses), and `crates/ui/src/ability_bar.rs`.
 
-- [ ] **Step 2: Move struct + `Default` impl**
+- [x] **Step 2: Move struct + `Default` impl**
 
 Cut `pub struct SporeAction { ... }` and `impl Default for SporeAction { ... }` from `crates/core/src/abilities.rs:33-48` (verify the exact range before cutting). Paste into `crates/fruiting/src/spores.rs` near the top, below the existing imports.
 
-- [ ] **Step 3: Drop the now-self-import in `spores.rs`**
+- [x] **Step 3: Drop the now-self-import in `spores.rs`**
 
 `crates/fruiting/src/spores.rs:2-5` reads `use fungai_core::{ ..., SPORE_RELAY_ACCURACY_RADIUS, SporeAction, Tile, };`. Remove `SporeAction,` from that list (the type now lives in this crate). Leave the other names alone.
 
-- [ ] **Step 4: Remove from core's plugin**
+- [x] **Step 4: Remove from core's plugin**
 
 Delete `.init_resource::<SporeAction>()` from `crates/core/src/lib.rs:33`.
 
-- [ ] **Step 5: Add a production init in `FruitingPlugin`**
+- [x] **Step 5: Add a production init in `FruitingPlugin`**
 
 Open `crates/fruiting/src/lib.rs:14-28` (`FruitingPlugin::build`). It currently inits `SporeRng` only. Add `.init_resource::<SporeAction>()` to that chain. The existing `spores.rs:106` init lives inside `#[cfg(test)] mod tests` and does not register the resource for production — this new line is required.
 
-- [ ] **Step 6: Re-export from `fruiting/lib.rs`**
+- [x] **Step 6: Re-export from `fruiting/lib.rs`**
 
 Update the existing `pub use spores::{SporeRng, spore_system};` at `crates/fruiting/src/lib.rs:11` to also re-export `SporeAction`.
 
-- [ ] **Step 7: Add the workspace dep on `fruiting/` to `ui/`**
+- [x] **Step 7: Add the workspace dep on `fruiting/` to `ui/`**
 
 `crates/ui/Cargo.toml` lists only `fungai_core` and `fungai_input` (and, after Task 1, `fungai_regions`). Add `fungai_fruiting = { workspace = true }`.
 
-- [ ] **Step 8: Update consumer imports**
+- [x] **Step 8: Update consumer imports**
 
 In `crates/ui/src/ability_bar.rs:5`, peel `SporeAction` out of the `use fungai_core::{ ... }` block and add `use fungai_fruiting::SporeAction;`.
 
-- [ ] **Step 9: Verify build and tests**
+- [x] **Step 9: Verify build and tests**
 
 Run: `cargo check --workspace && cargo nextest run --workspace && cargo clippy --workspace --all-targets -- -D warnings`
 Expected: all clean.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 Run: `git add -A && git commit -m "move SporeAction from core to fruiting"`
 
