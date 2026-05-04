@@ -25,8 +25,15 @@ fungai_ai = { path = "crates/ai" }
 fungai_fruiting = { path = "crates/fruiting" }
 fungai_ui = { path = "crates/ui" }
 
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
 [profile.dev]
 opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
