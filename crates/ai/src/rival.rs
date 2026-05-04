@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{GridPos, GridWorld, Hex, Occupant, RivalId, TerrainType, Tile};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 
@@ -32,7 +32,7 @@ impl Default for RivalState {
 pub fn rival_ai_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
     grid: Res<GridWorld>,
-    rival_state: ResMut<RivalState>,
+    rival_state: Res<RivalState>,
     mut rng: ResMut<RivalRng>,
 ) {
     let rid = rival_state.rival_id;

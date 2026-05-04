@@ -9,43 +9,19 @@ pub fn region_tracking_system(
     grid: Res<GridWorld>,
     mut region_states: ResMut<RegionStates>,
 ) {
-    let mut player_tiles: HashMap<Hex, RegionId> = HashMap::default();
-    for (gpos, tile) in tiles.iter() {
-        if let Occupant::Player(rid) = tile.occupant {
-            player_tiles.insert(gpos.0, rid);
-        }
-    }
+    let player_tiles: HashMap<Hex, RegionId> = tiles
+        .iter()
+        .filter_map(|(gpos, tile)| match tile.occupant {
+            Occupant::Player(rid) => Some((gpos.0, rid)),
+            _ => None,
+        })
+        .collect();
 
     for state in region_states.regions.values_mut() {
         state.tile_count = 0;
     }
 
-    let mut visited: HashSet<Hex> = HashSet::default();
-    let mut components: Vec<(RegionId, Vec<Hex>)> = Vec::new();
-
-    for (&pos, &original_rid) in &player_tiles {
-        if visited.contains(&pos) {
-            continue;
-        }
-        let mut component = Vec::new();
-        let mut stack = vec![pos];
-        while let Some(p) = stack.pop() {
-            if !visited.insert(p) {
-                continue;
-            }
-            if player_tiles.contains_key(&p) {
-                component.push(p);
-                for (neighbor, _) in grid.neighbors(p) {
-                    if !visited.contains(&neighbor) && player_tiles.contains_key(&neighbor) {
-                        stack.push(neighbor);
-                    }
-                }
-            }
-        }
-        if !component.is_empty() {
-            components.push((original_rid, component));
-        }
-    }
+    let components = connected_components(&player_tiles, &grid);
 
     // First connected component keeps the original id, splits get new ones
     let mut seen_rids: HashSet<RegionId> = HashSet::default();
@@ -68,24 +44,49 @@ pub fn region_tracking_system(
             state.biomass = biomass_sum;
         }
 
-        for &pos in positions {
-            if let Some(&entity) = grid.tiles.get(&pos)
-                && let Ok((_, mut tile)) = tiles.get_mut(entity)
-            {
-                tile.occupant = Occupant::Player(rid);
+        if rid != *original_rid {
+            for &pos in positions {
+                if let Some(&entity) = grid.tiles.get(&pos)
+                    && let Ok((_, mut tile)) = tiles.get_mut(entity)
+                {
+                    tile.occupant = Occupant::Player(rid);
+                }
             }
         }
     }
 
-    let empty_rids: Vec<RegionId> = region_states
-        .regions
-        .iter()
-        .filter(|(_, s)| s.tile_count == 0)
-        .map(|(id, _)| *id)
-        .collect();
-    for rid in empty_rids {
-        region_states.remove(rid);
+    region_states.regions.retain(|_, s| s.tile_count > 0);
+}
+
+fn connected_components(
+    player_tiles: &HashMap<Hex, RegionId>,
+    grid: &GridWorld,
+) -> Vec<(RegionId, Vec<Hex>)> {
+    let mut visited: HashSet<Hex> = HashSet::default();
+    let mut components = Vec::new();
+
+    for (&start, &original_rid) in player_tiles {
+        if visited.contains(&start) {
+            continue;
+        }
+        let mut component = Vec::new();
+        let mut stack = vec![start];
+        while let Some(p) = stack.pop() {
+            if !visited.insert(p) {
+                continue;
+            }
+            component.push(p);
+            for (neighbor, _) in grid.neighbors(p) {
+                if !visited.contains(&neighbor) && player_tiles.contains_key(&neighbor) {
+                    stack.push(neighbor);
+                }
+            }
+        }
+        if !component.is_empty() {
+            components.push((original_rid, component));
+        }
     }
+    components
 }
 
 #[cfg(test)]

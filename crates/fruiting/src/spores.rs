@@ -5,6 +5,7 @@ use fungai_core::{
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
+use rand::seq::IteratorRandom;
 
 #[derive(Resource)]
 pub struct SporeRng(pub StdRng);
@@ -36,14 +37,10 @@ pub fn spore_system(
     }
 
     // Pick one random mushroom to fire from
-    let mufungai_list: Vec<&MushroomEntity> = mushrooms.iter().collect();
-    if mufungai_list.is_empty() {
+    let Some(mushroom) = mushrooms.iter().choose(&mut rng.0) else {
         spore_action.triggered = false;
         return;
-    }
-
-    let idx = rng.0.random_range(0..mufungai_list.len());
-    let mushroom = mufungai_list[idx];
+    };
 
     let owning_region = find_owning_region(&tiles, mushroom.pos);
     let Some(region_id) = owning_region else {
@@ -83,29 +80,17 @@ fn pick_spore_landing(
     rng: &mut StdRng,
 ) -> Option<Hex> {
     let radius = SPORE_RELAY_ACCURACY_RADIUS as u32;
-
-    let candidates: Vec<Hex> = tiles
+    tiles
         .iter()
         .filter_map(|(gpos, tile)| {
             let dist = gpos.0.unsigned_distance_to(origin);
-            if dist <= radius
+            (dist <= radius
                 && tile.terrain.is_passable()
                 && !tile.occupant.is_player()
-                && !tile.occupant.is_rival()
-            {
-                Some(gpos.0)
-            } else {
-                None
-            }
+                && !tile.occupant.is_rival())
+            .then_some(gpos.0)
         })
-        .collect();
-
-    if candidates.is_empty() {
-        return None;
-    }
-
-    let idx = rng.random_range(0..candidates.len());
-    Some(candidates[idx])
+        .choose(rng)
 }
 
 #[cfg(test)]

@@ -56,7 +56,11 @@ impl Plugin for RenderPlugin {
                         .after(terrain_render::terrain_render_system),
                     network_render::network_render_system,
                     entity_render::tip_render_system,
-                    entity_render::organism_render_system,
+                    (
+                        entity_render::despawn_orphaned_organism_sprites,
+                        entity_render::spawn_organism_sprites,
+                    )
+                        .chain(),
                     entity_render::priority_arrow_render_system,
                     entity_render::region_highlight_render_system,
                     atmosphere::update_vignette,

@@ -38,14 +38,28 @@ pub struct AbilityBarEntities<'w, 's> {
     existing_spore: Query<'w, 's, Entity, With<SporeButton>>,
 }
 
+// Each parameter is a distinct ECS signal feeding the change-detection guard below.
+#[allow(clippy::too_many_arguments)]
 pub fn update_ability_bar(
     region_states: Res<RegionStates>,
     selected: Res<SelectedRegion>,
     spore_action: Res<SporeAction>,
     mushrooms: Query<&MushroomEntity>,
+    new_mushrooms: Query<(), Added<MushroomEntity>>,
+    mut removed_mushrooms: RemovedComponents<MushroomEntity>,
     entities: AbilityBarEntities,
     mut commands: Commands,
 ) {
+    let removed_count = removed_mushrooms.read().count();
+    let mushroom_set_changed = new_mushrooms.iter().next().is_some() || removed_count > 0;
+    if !selected.is_changed()
+        && !region_states.is_changed()
+        && !spore_action.is_changed()
+        && !mushroom_set_changed
+    {
+        return;
+    }
+
     for entity in entities.existing_buttons.iter() {
         commands.entity(entity).despawn();
     }

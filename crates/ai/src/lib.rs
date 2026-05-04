@@ -7,10 +7,10 @@ mod environment;
 mod organisms;
 mod rival;
 
-pub use combat::*;
-pub use environment::*;
-pub use organisms::*;
-pub use rival::*;
+pub use combat::combat_resolution_system;
+pub use environment::{EnvironmentRng, environment_threat_system};
+pub use organisms::{bacteria_system, fauna_system, neutral_fungi_system, plant_system};
+pub use rival::{RivalRng, RivalState, rival_ai_system};
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AiSystems {

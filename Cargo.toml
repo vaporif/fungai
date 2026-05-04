@@ -7,11 +7,14 @@ members = ["crates/*", "bin"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "LICENSE"
+publish = false
 
 [workspace.dependencies]
 bevy = "0.18"
-rand = "0.9"
+rand = "0.10"
+hexx = { version = "0.24", features = ["bevy"] }
+
 fungai_core = { path = "crates/core" }
 fungai_world = { path = "crates/world" }
 fungai_growth = { path = "crates/growth" }
@@ -22,8 +25,15 @@ fungai_ai = { path = "crates/ai" }
 fungai_fruiting = { path = "crates/fruiting" }
 fungai_ui = { path = "crates/ui" }
 
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
 [profile.dev]
 opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+

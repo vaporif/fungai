@@ -89,6 +89,7 @@
         bacon
         cargo-nextest
         cargo-watch
+        lld
       ];
 
       mkDevShell = toolchain:
@@ -118,14 +119,14 @@
           + (
             if pkgs.stdenv.hostPlatform.isDarwin
             then ''
-              # macOS: use LLVM backend (cranelift breaks bevy dynamic linking)
+              # macOS: use LLVM backend (cranelift breaks bevy dynamic linking).
+              # Rustflags (share-generics, lld) live in .cargo/config.toml.
               # Run with: cargo run --features dev
-              export RUSTFLAGS="-Zshare-generics=y $RUSTFLAGS"
             ''
             else ''
-              # Linux: cranelift works fine with dynamic linking
+              # Linux: cranelift works fine with dynamic linking.
+              # Rustflags (share-generics, lld) live in .cargo/config.toml.
               export CARGO_PROFILE_DEV_CODEGEN_BACKEND=cranelift
-              export RUSTFLAGS="-Zshare-generics=y $RUSTFLAGS"
             ''
           );
       });

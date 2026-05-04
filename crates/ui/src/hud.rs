@@ -69,7 +69,6 @@ pub fn spawn_hud(mut commands: Commands) {
         },
     ));
 
-    // Hints panel (top-right)
     commands
         .spawn((
             HintsPanel,

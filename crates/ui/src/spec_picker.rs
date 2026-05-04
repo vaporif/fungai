@@ -60,14 +60,20 @@ pub fn spec_picker_system(
     region_states: Res<RegionStates>,
     existing: Query<Entity, With<SpecPickerPanel>>,
 ) {
-    let should_show = selected.region_id.and_then(|rid| region_states.get(rid));
+    if !selected.is_changed() && !region_states.is_changed() {
+        return;
+    }
 
-    let Some(_state) = should_show else {
+    let should_show = selected
+        .region_id
+        .is_some_and(|rid| region_states.get(rid).is_some());
+
+    if !should_show {
         for entity in existing.iter() {
             commands.entity(entity).despawn();
         }
         return;
-    };
+    }
 
     // Already showing — don't respawn
     if !existing.is_empty() {
@@ -126,7 +132,6 @@ pub fn spec_picker_system(
         });
 }
 
-/// Handle clicks — set target specialization and highlight the active button.
 pub fn spec_picker_click_system(
     interactions: Query<(&Interaction, &SpecPickerButton), Changed<Interaction>>,
     selected: Res<SelectedRegion>,
@@ -153,6 +158,10 @@ pub fn spec_picker_highlight_system(
     region_states: Res<RegionStates>,
     mut buttons: Query<(&SpecPickerButton, &mut BackgroundColor)>,
 ) {
+    if !selected.is_changed() && !region_states.is_changed() {
+        return;
+    }
+
     let target = selected
         .region_id
         .and_then(|rid| region_states.get(rid))
@@ -165,10 +174,11 @@ pub fn spec_picker_highlight_system(
             .map(|(_, _, c)| *c)
             .unwrap_or(Color::srgb(0.3, 0.3, 0.3));
 
-        if target == Some(button.spec) {
-            *bg = BackgroundColor(base_color.with_alpha(1.0));
+        let alpha = if target == Some(button.spec) {
+            1.0
         } else {
-            *bg = BackgroundColor(base_color.with_alpha(0.3));
-        }
+            0.3
+        };
+        *bg = BackgroundColor(base_color.with_alpha(alpha));
     }
 }

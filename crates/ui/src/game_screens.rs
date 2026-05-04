@@ -13,10 +13,6 @@ pub struct EndGamePanel;
 #[derive(Component)]
 pub struct RestartButton;
 
-// ---------------------------------------------------------------------------
-// Systems
-// ---------------------------------------------------------------------------
-
 pub fn game_outcome_system(
     mut phase: ResMut<GamePhase>,
     game_state: Res<GameState>,
@@ -208,10 +204,6 @@ pub fn restart_button_system(
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

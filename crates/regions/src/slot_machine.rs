@@ -1,9 +1,9 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 use fungai_core::{SlotMachineTriggered, StudyComplete, UnlockOption, UnlockPool};
-use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::seq::IndexedRandom;
 
 #[derive(Resource)]
 pub struct SlotMachineRng(pub StdRng);
@@ -21,15 +21,7 @@ pub fn slot_machine_system(
 ) {
     for event in study_messages.read() {
         let pool_options = unlock_pool_options(event.pool);
-        let mut selected: Vec<UnlockOption> = Vec::new();
-        let mut indices: Vec<usize> = (0..pool_options.len()).collect();
-
-        let count = 3.min(indices.len());
-        for _ in 0..count {
-            let idx = rng.0.random_range(0..indices.len());
-            let pick = indices.swap_remove(idx);
-            selected.push(pool_options[pick].clone());
-        }
+        let selected: Vec<UnlockOption> = pool_options.sample(&mut rng.0, 3).cloned().collect();
 
         slot_messages.write(SlotMachineTriggered {
             pool: event.pool,

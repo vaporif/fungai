@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{
+    GridPos, GridWorld, HexLayout, HyphalTip, Occupant, RegionId, RegionStates, RivalId,
+    SelectedRegion, SpecializationType, Tile,
+};
 use hexx::Hex;
 
 #[derive(Resource, Default, Debug)]
@@ -118,12 +121,17 @@ pub fn extract_tip_positions(
     region_states: Res<RegionStates>,
     mut tip_positions: ResMut<TipPositions>,
 ) {
-    tip_positions.tips.clear();
-    for (gpos, tip) in tips.iter() {
-        let spec = region_states
-            .get(tip.region_id)
-            .and_then(|r| r.specialization);
-        tip_positions.tips.push((gpos.0, spec));
+    let new_tips: Vec<(Hex, Option<SpecializationType>)> = tips
+        .iter()
+        .map(|(gpos, tip)| {
+            let spec = region_states
+                .get(tip.region_id)
+                .and_then(|r| r.specialization);
+            (gpos.0, spec)
+        })
+        .collect();
+    if tip_positions.tips != new_tips {
+        tip_positions.tips = new_tips;
     }
 }
 
@@ -274,11 +282,14 @@ pub fn extract_priority_bias_map(
     tiles: Query<(&GridPos, &Tile)>,
     mut bias_map: ResMut<PriorityBiasMap>,
 ) {
-    bias_map.biases.clear();
-    for (gpos, tile) in tiles.iter() {
-        if tile.priority_bias.length_squared() > 0.001 {
-            bias_map.biases.insert(gpos.0, tile.priority_bias);
-        }
+    let new_biases: HashMap<Hex, Vec2> = tiles
+        .iter()
+        .filter_map(|(gpos, tile)| {
+            (tile.priority_bias.length_squared() > 0.001).then_some((gpos.0, tile.priority_bias))
+        })
+        .collect();
+    if bias_map.biases != new_biases {
+        bias_map.biases = new_biases;
     }
 }
 
@@ -287,18 +298,22 @@ pub fn extract_selected_region_tiles(
     selected: Res<SelectedRegion>,
     mut selected_tiles: ResMut<SelectedRegionTiles>,
 ) {
-    selected_tiles.tiles.clear();
-    if let Some(rid) = selected.region_id {
-        for (gpos, tile) in tiles.iter() {
-            if tile.occupant.region_id() == Some(rid) {
-                selected_tiles.tiles.push(gpos.0);
-            }
-        }
+    let new_tiles: Vec<Hex> = match selected.region_id {
+        Some(rid) => tiles
+            .iter()
+            .filter_map(|(gpos, tile)| (tile.occupant.region_id() == Some(rid)).then_some(gpos.0))
+            .collect(),
+        None => Vec::new(),
+    };
+    if selected_tiles.tiles != new_tiles {
+        selected_tiles.tiles = new_tiles;
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use fungai_core::create_hex_layout;
+
     use super::*;
 
     fn test_app() -> App {

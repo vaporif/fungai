@@ -2,7 +2,7 @@
 name = "fungai"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license-file.workspace = true
 
 [features]
 dev = ["bevy/dynamic_linking", "bevy/hotpatching", "bevy/dev"]

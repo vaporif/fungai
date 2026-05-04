@@ -18,11 +18,10 @@ pub fn mufungai_effect_system(
                 tile.moisture = (tile.moisture + MUSHROOM_MOISTURE_BONUS * 0.1).min(1.0);
             }
 
-            if !(bonus_region.is_none() && dist <= 3) {
-                continue;
-            }
-
-            if let Occupant::Player(rid) = tile.occupant {
+            if bonus_region.is_none()
+                && dist <= 3
+                && let Occupant::Player(rid) = tile.occupant
+            {
                 bonus_region = Some(rid);
             }
         }

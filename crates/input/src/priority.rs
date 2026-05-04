@@ -26,27 +26,25 @@ pub fn priority_system(
         return;
     };
 
-    for (_gpos, mut tile) in &mut tiles {
-        tile.priority_bias = Vec2::ZERO;
-    }
-
     for (gpos, mut tile) in &mut tiles {
         let dist = gpos.0.distance_to(target_hex);
-        if dist <= PRIORITY_RADIUS {
-            let tile_world = layout.hex_to_world_pos(gpos.0);
-            let target_world = layout.hex_to_world_pos(target_hex);
-            let dir = target_world - tile_world;
+        tile.priority_bias = if dist <= PRIORITY_RADIUS {
+            let dir = layout.hex_to_world_pos(target_hex) - layout.hex_to_world_pos(gpos.0);
             if dir.length_squared() > 0.01 {
-                tile.priority_bias = dir.normalize() * 0.5;
+                dir.normalize() * 0.5
+            } else {
+                Vec2::ZERO
             }
-        }
+        } else {
+            Vec2::ZERO
+        };
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fungai_core::{create_hex_layout, GridPos, GridWorld, Hex, Tile};
+    use fungai_core::{GridPos, GridWorld, Hex, Tile, create_hex_layout};
 
     fn test_app() -> App {
         let mut app = App::new();
