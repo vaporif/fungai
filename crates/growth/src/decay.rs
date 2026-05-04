@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{Occupant, RegionStates, Tile};
 
 pub fn decay_system(mut tiles: Query<&mut Tile>, region_states: Res<RegionStates>) {
     for mut tile in tiles.iter_mut() {
@@ -18,6 +18,8 @@ pub fn decay_system(mut tiles: Query<&mut Tile>, region_states: Res<RegionStates
 
 #[cfg(test)]
 mod tests {
+    use fungai_core::{GridPos, GridWorld, Hex};
+
     use super::*;
 
     fn test_app() -> App {

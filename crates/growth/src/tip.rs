@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{
+    ANASTOMOSIS_BIOMASS_BONUS, GridPos, GridWorld, Hex, HexLayout, HyphalTip, Occupant, RegionId,
+    RegionStates, SpecializationType, Tile,
+};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 
@@ -128,6 +131,8 @@ pub fn hyphal_tip_system(
 
 #[cfg(test)]
 mod tests {
+    use fungai_core::{TerrainType, create_hex_layout};
+
     use super::*;
 
     fn test_app() -> App {

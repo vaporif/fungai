@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{GridPos, GridWorld, Hex, Occupant, RivalId, TerrainType, Tile};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 

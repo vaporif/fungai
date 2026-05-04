@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
-use fungai_core::*;
+use fungai_core::{
+    GridPos, GridWorld, HexLayout, HyphalTip, Occupant, RegionId, RegionStates, RivalId,
+    SelectedRegion, SpecializationType, Tile,
+};
 use hexx::Hex;
 
 #[derive(Resource, Default, Debug)]
@@ -309,6 +312,8 @@ pub fn extract_selected_region_tiles(
 
 #[cfg(test)]
 mod tests {
+    use fungai_core::create_hex_layout;
+
     use super::*;
 
     fn test_app() -> App {
