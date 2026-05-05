@@ -12,9 +12,9 @@ pub fn priority_system(
     layout: Res<HexLayout>,
     mut tiles: Query<(&GridPos, &mut Tile)>,
 ) {
-    // ClearPriority is the longer chord; with PrioritizeLongest clash strategy
-    // it suppresses SetPriority. Check it first as a defensive guard against
-    // strategy changes.
+    // Check the longer chord first. If the clash strategy is ever switched
+    // away from PrioritizeLongest, both actions will fire on Shift+P and the
+    // clear must still win.
     if actions.just_pressed(&Action::ClearPriority) {
         for (_gpos, mut tile) in &mut tiles {
             tile.priority_bias = Vec2::ZERO;

@@ -30,25 +30,21 @@ pub enum Action {
 pub fn default_input_map() -> InputMap<Action> {
     let mut map = InputMap::default();
 
-    // Camera: WASD and arrow keys both produce a normalised dual-axis pair.
     map.insert_dual_axis(Action::CameraMove, VirtualDPad::wasd());
     map.insert_dual_axis(Action::CameraMove, VirtualDPad::arrow_keys());
 
-    // Zoom: vertical mouse scroll.
     map.insert_axis(Action::Zoom, MouseScrollAxis::Y);
 
-    // Mouse selection.
     map.insert(Action::SelectTile, MouseButton::Left);
 
-    // Priority: bare P sets bias, Shift+P clears. PrioritizeLongest clash strategy
-    // suppresses SetPriority while the longer chord matches.
+    // PrioritizeLongest (the leafwing default) suppresses SetPriority whenever
+    // the Shift+P chord matches, so plain P never fires as a clear.
     map.insert(Action::SetPriority, KeyCode::KeyP);
     map.insert(
         Action::ClearPriority,
         ButtonlikeChord::modified(ModifierKey::Shift, KeyCode::KeyP),
     );
 
-    // Specialization 1-8.
     map.insert(Action::Spec1, KeyCode::Digit1);
     map.insert(Action::Spec2, KeyCode::Digit2);
     map.insert(Action::Spec3, KeyCode::Digit3);
@@ -58,7 +54,6 @@ pub fn default_input_map() -> InputMap<Action> {
     map.insert(Action::Spec7, KeyCode::Digit7);
     map.insert(Action::Spec8, KeyCode::Digit8);
 
-    // Speed.
     map.insert(Action::TogglePause, KeyCode::Space);
     map.insert(Action::SpeedUp, KeyCode::Equal);
     map.insert(Action::SpeedUp, KeyCode::NumpadAdd);
