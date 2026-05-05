@@ -2,12 +2,14 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use fungai_core::*;
+use leafwing_input_manager::prelude::*;
 
+use crate::action::Action;
 use crate::camera::GameCamera;
 
 #[derive(SystemParam)]
 pub struct PointerInput<'w, 's> {
-    mouse: Res<'w, ButtonInput<MouseButton>>,
+    actions: Res<'w, ActionState<Action>>,
     windows: Query<'w, 's, &'static Window, With<PrimaryWindow>>,
     camera_q: Query<'w, 's, (&'static Camera, &'static GlobalTransform), With<GameCamera>>,
     ui_interactions: Query<'w, 's, &'static Interaction, With<Button>>,
@@ -20,11 +22,11 @@ pub fn selection_system(
     mut selected: ResMut<SelectedRegion>,
     layout: Res<HexLayout>,
 ) {
-    if !pointer.mouse.just_pressed(MouseButton::Left) {
+    if !pointer.actions.just_pressed(&Action::SelectTile) {
         return;
     }
 
-    // Don't process world clicks when UI buttons are being pressed
+    // Skip world clicks while a UI button is being interacted with.
     for interaction in pointer.ui_interactions.iter() {
         if *interaction != Interaction::None {
             return;
