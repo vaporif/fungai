@@ -127,7 +127,6 @@ pub struct HudTexts<'w, 's> {
     hints: Query<'w, 's, &'static mut Visibility, With<HintsPanel>>,
 }
 
-// Bevy systems naturally accumulate parameters; each one here is a distinct resource.
 #[allow(clippy::too_many_arguments)]
 pub fn update_hud(
     game_state: Res<GameState>,
