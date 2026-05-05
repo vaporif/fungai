@@ -14,6 +14,7 @@ publish = false
 bevy = "0.18"
 rand = "0.10"
 hexx = { version = "0.24", features = ["bevy"] }
+leafwing-input-manager = "0.20"
 
 fungai_core = { path = "crates/core" }
 fungai_world = { path = "crates/world" }

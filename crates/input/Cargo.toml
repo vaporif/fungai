@@ -7,3 +7,4 @@ license-file.workspace = true
 [dependencies]
 bevy = { workspace = true }
 fungai_core = { workspace = true }
+leafwing-input-manager = { workspace = true }
