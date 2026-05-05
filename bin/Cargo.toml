@@ -9,6 +9,7 @@ dev = ["bevy/dynamic_linking", "bevy/hotpatching", "bevy/dev"]
 
 [dependencies]
 bevy = { workspace = true }
+clap = { version = "4", features = ["derive"] }
 fungai_core = { workspace = true }
 fungai_world = { workspace = true }
 fungai_growth = { workspace = true }

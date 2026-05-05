@@ -43,20 +43,34 @@ pub struct AbilityBarEntities<'w, 's> {
     existing_spore: Query<'w, 's, Entity, With<SporeButton>>,
 }
 
-// Each parameter is a distinct ECS signal feeding the change-detection guard below.
-#[allow(clippy::too_many_arguments)]
+#[derive(SystemParam)]
+pub struct AbilityBarInputs<'w> {
+    region_states: Res<'w, RegionStates>,
+    selected: Res<'w, SelectedRegion>,
+    spore_action: Res<'w, SporeAction>,
+}
+
+#[derive(SystemParam)]
+pub struct MushroomSignals<'w, 's> {
+    existing: Query<'w, 's, &'static MushroomEntity>,
+    added: Query<'w, 's, (), Added<MushroomEntity>>,
+    removed: RemovedComponents<'w, 's, MushroomEntity>,
+}
+
 pub fn update_ability_bar(
-    region_states: Res<RegionStates>,
-    selected: Res<SelectedRegion>,
-    spore_action: Res<SporeAction>,
-    mushrooms: Query<&MushroomEntity>,
-    new_mushrooms: Query<(), Added<MushroomEntity>>,
-    mut removed_mushrooms: RemovedComponents<MushroomEntity>,
+    inputs: AbilityBarInputs,
+    mut mushrooms: MushroomSignals,
     entities: AbilityBarEntities,
     mut commands: Commands,
 ) {
-    let removed_count = removed_mushrooms.read().count();
-    let mushroom_set_changed = new_mushrooms.iter().next().is_some() || removed_count > 0;
+    let AbilityBarInputs {
+        region_states,
+        selected,
+        spore_action,
+    } = inputs;
+
+    let removed_count = mushrooms.removed.read().count();
+    let mushroom_set_changed = mushrooms.added.iter().next().is_some() || removed_count > 0;
     if !selected.is_changed()
         && !region_states.is_changed()
         && !spore_action.is_changed()
@@ -128,7 +142,7 @@ pub fn update_ability_bar(
     }
 
     // Spore button when mushrooms exist
-    if mushrooms.iter().next().is_some() {
+    if mushrooms.existing.iter().next().is_some() {
         let label = if spore_action.cooldown_remaining > 0 {
             format!("Spores ({})", spore_action.cooldown_remaining)
         } else {

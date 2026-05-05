@@ -1,6 +1,6 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use fungai_core::{GameState, RegionStates, SimulationSpeed};
+use fungai_core::{GameState, LaunchConfig, RegionStates, SimulationSpeed};
 use fungai_input::SelectedRegion;
 
 #[derive(Resource, Debug, Reflect)]
@@ -136,23 +136,37 @@ pub struct HudTexts<'w, 's> {
     hints: Query<'w, 's, &'static mut Visibility, With<HintsPanel>>,
 }
 
-pub fn update_hud(
-    game_state: Res<GameState>,
-    region_states: Res<RegionStates>,
-    selected: Res<SelectedRegion>,
-    speed: Res<SimulationSpeed>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut hints_visible: ResMut<HintsVisible>,
-    mut texts: HudTexts,
-) {
+#[derive(SystemParam)]
+pub struct HudInputs<'w> {
+    game_state: Res<'w, GameState>,
+    region_states: Res<'w, RegionStates>,
+    selected: Res<'w, SelectedRegion>,
+    speed: Res<'w, SimulationSpeed>,
+    keyboard: Res<'w, ButtonInput<KeyCode>>,
+    config: Res<'w, LaunchConfig>,
+    hints_visible: ResMut<'w, HintsVisible>,
+}
+
+pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
+    let HudInputs {
+        game_state,
+        region_states,
+        selected,
+        speed,
+        keyboard,
+        config,
+        mut hints_visible,
+    } = inputs;
+
     if let Ok(mut text) = texts.turn.single_mut() {
         **text = format!(
-            "Turn: {} | Fragments: {}/{} | Mushrooms: {}/{}",
+            "Turn: {} | Fragments: {}/{} | Mushrooms: {}/{} | Seed: {}",
             game_state.turn,
             game_state.fragments_fused,
             game_state.fragments_total,
             game_state.mushrooms_fruited,
             game_state.mushrooms_required,
+            config.seed,
         );
     }
 
