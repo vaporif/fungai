@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use fungai_core::{
     BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HyphalTip,
-    NeutralFungusAgent, Occupant, PlantRootAgent, RegionId, RegionStates, RivalId,
+    LaunchConfig, NeutralFungusAgent, Occupant, PlantRootAgent, RegionId, RegionStates, RivalId,
     SpecializationType, TerrainType, Tile, TileContents,
 };
 use hexx::{Hex, HexOrientation, OffsetHexMode};
@@ -28,15 +28,6 @@ fn offset_to_hex(col: i32, row: i32) -> Hex {
     Hex::from_offset_coordinates([col, row], OffsetHexMode::Odd, HexOrientation::Pointy)
 }
 
-#[derive(Resource)]
-pub struct TerrainSeed(pub u64);
-
-impl Default for TerrainSeed {
-    fn default() -> Self {
-        Self(42)
-    }
-}
-
 #[derive(Clone, Copy)]
 struct TileBase {
     terrain: TerrainType,
@@ -58,16 +49,15 @@ pub fn terrain_generation(
     mut grid: ResMut<GridWorld>,
     mut game_state: ResMut<GameState>,
     mut region_states: ResMut<RegionStates>,
-    seed: Res<TerrainSeed>,
+    config: Res<LaunchConfig>,
 ) {
-    let mut rng = StdRng::seed_from_u64(seed.0);
+    let mut rng = StdRng::seed_from_u64(config.seed);
     grid.width = MAP_WIDTH;
     grid.height = MAP_HEIGHT;
 
     let mut tile_data = build_tile_data(&mut rng);
     let mut soil_pool = build_soil_pool(&tile_data, &mut rng);
-    let mut placements =
-        place_features(&mut rng, &mut tile_data, &mut soil_pool, &mut game_state);
+    let mut placements = place_features(&mut rng, &mut tile_data, &mut soil_pool, &mut game_state);
 
     let player_rid = init_player_region(&mut region_states);
     let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
@@ -81,10 +71,12 @@ pub fn terrain_generation(
         &mut grid,
         &tile_data,
         &mut placements,
-        player_rid,
-        rival_id,
-        &player_hexes,
-        &rival_hexes,
+        RegionAssignment {
+            player_rid,
+            rival_id,
+            player_hexes: &player_hexes,
+            rival_hexes: &rival_hexes,
+        },
     );
     spawn_agents(&mut commands, placements);
     spawn_initial_tips(&mut commands, &grid, player_start, player_rid);
@@ -119,9 +111,7 @@ fn build_tile_data(rng: &mut StdRng) -> HashMap<Hex, TileBase> {
             let hex = offset_to_hex(x, y);
             let depth_ratio = 1.0 - (y as f32 / MAP_HEIGHT as f32);
             let terrain = pick_terrain(rng, y, depth_ratio);
-            let moisture = (0.3
-                + 0.5 * (y as f32 / MAP_HEIGHT as f32)
-                + rng.random::<f32>() * 0.2)
+            let moisture = (0.3 + 0.5 * (y as f32 / MAP_HEIGHT as f32) + rng.random::<f32>() * 0.2)
                 .clamp(0.0, 1.0);
             let nutrient_level = 0.2 + rng.random::<f32>() * 0.6;
             data.insert(
@@ -169,7 +159,8 @@ fn place_features(
         let Some(pos) = pop_unclaimed(soil_pool, &p.contents) else {
             break;
         };
-        p.contents.insert(pos, TileContents::Fragment(FragmentId(i)));
+        p.contents
+            .insert(pos, TileContents::Fragment(FragmentId(i)));
         p.fragments.push((pos, FragmentId(i)));
     }
 
@@ -233,34 +224,37 @@ fn init_player_region(region_states: &mut RegionStates) -> RegionId {
     rid
 }
 
-#[allow(clippy::too_many_arguments)]
+struct RegionAssignment<'a> {
+    player_rid: RegionId,
+    rival_id: RivalId,
+    player_hexes: &'a HashSet<Hex>,
+    rival_hexes: &'a HashSet<Hex>,
+}
+
 fn spawn_world_tiles(
     commands: &mut Commands,
     grid: &mut GridWorld,
     tile_data: &HashMap<Hex, TileBase>,
     placements: &mut Placements,
-    player_rid: RegionId,
-    rival_id: RivalId,
-    player_hexes: &HashSet<Hex>,
-    rival_hexes: &HashSet<Hex>,
+    assignment: RegionAssignment<'_>,
 ) {
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
             let hex = offset_to_hex(x, y);
             let base = tile_data[&hex];
-            let tile = if player_hexes.contains(&hex) {
+            let tile = if assignment.player_hexes.contains(&hex) {
                 Tile {
                     terrain: TerrainType::Soil,
-                    occupant: Occupant::Player(player_rid),
+                    occupant: Occupant::Player(assignment.player_rid),
                     nutrient_level: 0.8,
                     discovered: true,
                     biomass: 1.0,
                     ..default()
                 }
-            } else if rival_hexes.contains(&hex) {
+            } else if assignment.rival_hexes.contains(&hex) {
                 Tile {
                     terrain: TerrainType::Soil,
-                    occupant: Occupant::Rival(rival_id),
+                    occupant: Occupant::Rival(assignment.rival_id),
                     biomass: 1.5,
                     ..default()
                 }
@@ -352,7 +346,7 @@ mod tests {
         app.init_resource::<GridWorld>();
         app.init_resource::<GameState>();
         app.init_resource::<RegionStates>();
-        app.insert_resource(TerrainSeed(12345));
+        app.insert_resource(LaunchConfig { seed: 12345 });
         app
     }
 

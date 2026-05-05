@@ -1,5 +1,6 @@
 mod abilities;
 mod components;
+mod config;
 mod constants;
 mod grid;
 mod messages;
@@ -9,6 +10,7 @@ mod tile;
 
 pub use abilities::*;
 pub use components::*;
+pub use config::*;
 pub use constants::*;
 pub use grid::*;
 pub use messages::*;
@@ -23,6 +25,7 @@ pub struct CorePlugin;
 impl Plugin for CorePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(create_hex_layout())
+            .init_resource::<LaunchConfig>()
             .init_resource::<GridWorld>()
             .init_resource::<RegionStates>()
             .init_resource::<GameState>()

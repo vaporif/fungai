@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use fungai_core::{
     FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout, MushroomEntity,
@@ -65,21 +66,25 @@ pub fn tip_render_system(
 }
 
 // One `Added<T>` query per organism so each component picks its own sprite/colour.
-#[allow(clippy::too_many_arguments)]
+#[derive(SystemParam)]
+pub struct NewOrganisms<'w, 's> {
+    fragments: Query<'w, 's, (Entity, &'static GridPos), Added<FragmentAgent>>,
+    plants: Query<'w, 's, (Entity, &'static GridPos), Added<PlantRootAgent>>,
+    fauna: Query<'w, 's, (Entity, &'static GridPos), Added<FaunaAgent>>,
+    fruiting: Query<'w, 's, (Entity, &'static FruitingBody), Added<FruitingBody>>,
+    mushrooms: Query<'w, 's, (Entity, &'static MushroomEntity), Added<MushroomEntity>>,
+    neutral_fungi: Query<'w, 's, (Entity, &'static GridPos), Added<NeutralFungusAgent>>,
+}
+
 pub fn spawn_organism_sprites(
     mut commands: Commands,
     sprites: Res<EntitySprites>,
     layout: Res<HexLayout>,
-    new_fragments: Query<(Entity, &GridPos), Added<FragmentAgent>>,
-    new_plants: Query<(Entity, &GridPos), Added<PlantRootAgent>>,
-    new_fauna: Query<(Entity, &GridPos), Added<FaunaAgent>>,
-    new_fruiting: Query<(Entity, &FruitingBody), Added<FruitingBody>>,
-    new_mushrooms: Query<(Entity, &MushroomEntity), Added<MushroomEntity>>,
-    new_neutral_fungi: Query<(Entity, &GridPos), Added<NeutralFungusAgent>>,
+    new_organisms: NewOrganisms,
 ) {
     let size = organism_sprite_size(&layout);
 
-    for (source, gpos) in new_fragments.iter() {
+    for (source, gpos) in new_organisms.fragments.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -94,7 +99,7 @@ pub fn spawn_organism_sprites(
         ));
     }
 
-    for (source, gpos) in new_plants.iter() {
+    for (source, gpos) in new_organisms.plants.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -109,7 +114,7 @@ pub fn spawn_organism_sprites(
         ));
     }
 
-    for (source, gpos) in new_fauna.iter() {
+    for (source, gpos) in new_organisms.fauna.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -124,7 +129,7 @@ pub fn spawn_organism_sprites(
         ));
     }
 
-    for (source, body) in new_fruiting.iter() {
+    for (source, body) in new_organisms.fruiting.iter() {
         let world_pos = layout.hex_to_world_pos(body.column_top);
         commands.spawn((
             OrganismSprite,
@@ -139,7 +144,7 @@ pub fn spawn_organism_sprites(
         ));
     }
 
-    for (source, mushroom) in new_mushrooms.iter() {
+    for (source, mushroom) in new_organisms.mushrooms.iter() {
         let world_pos = layout.hex_to_world_pos(mushroom.pos);
         commands.spawn((
             OrganismSprite,
@@ -154,7 +159,7 @@ pub fn spawn_organism_sprites(
         ));
     }
 
-    for (source, gpos) in new_neutral_fungi.iter() {
+    for (source, gpos) in new_organisms.neutral_fungi.iter() {
         let world_pos = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
             OrganismSprite,
@@ -171,24 +176,28 @@ pub fn spawn_organism_sprites(
 }
 
 // One `RemovedComponents<T>` per organism — they can't be merged into one param.
-#[allow(clippy::too_many_arguments)]
+#[derive(SystemParam)]
+pub struct RemovedOrganisms<'w, 's> {
+    fragments: RemovedComponents<'w, 's, FragmentAgent>,
+    plants: RemovedComponents<'w, 's, PlantRootAgent>,
+    fauna: RemovedComponents<'w, 's, FaunaAgent>,
+    fruiting: RemovedComponents<'w, 's, FruitingBody>,
+    mushrooms: RemovedComponents<'w, 's, MushroomEntity>,
+    neutral_fungi: RemovedComponents<'w, 's, NeutralFungusAgent>,
+}
+
 pub fn despawn_orphaned_organism_sprites(
     mut commands: Commands,
-    mut removed_fragments: RemovedComponents<FragmentAgent>,
-    mut removed_plants: RemovedComponents<PlantRootAgent>,
-    mut removed_fauna: RemovedComponents<FaunaAgent>,
-    mut removed_fruiting: RemovedComponents<FruitingBody>,
-    mut removed_mushrooms: RemovedComponents<MushroomEntity>,
-    mut removed_neutral_fungi: RemovedComponents<NeutralFungusAgent>,
+    mut removed_organisms: RemovedOrganisms,
     linked_sprites: Query<(Entity, &OrganismSpriteLink), With<OrganismSprite>>,
 ) {
     let mut removed: HashSet<Entity> = HashSet::new();
-    removed.extend(removed_fragments.read());
-    removed.extend(removed_plants.read());
-    removed.extend(removed_fauna.read());
-    removed.extend(removed_fruiting.read());
-    removed.extend(removed_mushrooms.read());
-    removed.extend(removed_neutral_fungi.read());
+    removed.extend(removed_organisms.fragments.read());
+    removed.extend(removed_organisms.plants.read());
+    removed.extend(removed_organisms.fauna.read());
+    removed.extend(removed_organisms.fruiting.read());
+    removed.extend(removed_organisms.mushrooms.read());
+    removed.extend(removed_organisms.neutral_fungi.read());
 
     if removed.is_empty() {
         return;
