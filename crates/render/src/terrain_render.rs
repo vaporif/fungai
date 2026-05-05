@@ -73,13 +73,7 @@ pub fn hex_to_tile_pos(hex: Hex) -> Option<TilePos> {
 }
 
 fn discovery_color(level: f32) -> Color {
-    LinearRgba {
-        red: HIDDEN.red + (VISIBLE.red - HIDDEN.red) * level,
-        green: HIDDEN.green + (VISIBLE.green - HIDDEN.green) * level,
-        blue: HIDDEN.blue + (VISIBLE.blue - HIDDEN.blue) * level,
-        alpha: 1.0,
-    }
-    .into()
+    HIDDEN.mix(&VISIBLE, level).into()
 }
 
 /// Holds the atlas handle so `assert_atlas_addresses_all_terrains` can re-read
@@ -122,7 +116,7 @@ pub fn spawn_terrain_tilemap(
     // negative offsets near the origin in some test grids) are skipped:
     // TileStorage::set indexes a flat Vec and would multiply-overflow on
     // wrapped u32 values.
-    for (&hex, &entity) in grid.tiles.iter() {
+    for (&hex, &entity) in &grid.tiles {
         let Ok(tile) = tiles.get(entity) else {
             continue;
         };
@@ -155,7 +149,7 @@ pub fn spawn_terrain_tilemap(
         &TilemapAnchor::None,
     );
     let world = layout.hex_to_world_pos(Hex::ZERO);
-    let origin = Vec3::new(world.x - local.x, world.y - local.y, TERRAIN_Z);
+    let origin = (world - local).extend(TERRAIN_Z);
 
     commands.entity(tilemap_entity).insert(TilemapBundle {
         size: map_size,
