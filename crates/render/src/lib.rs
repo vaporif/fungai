@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy::sprite_render::Material2dPlugin;
+use bevy_ecs_tilemap::prelude::TilemapPlugin;
 use fungai_core::SimulationSet;
+use fungai_world::terrain_generation;
 
 mod assets;
 mod atmosphere;
@@ -13,16 +15,17 @@ pub use data_layer::{
     BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls, RivalBranchGraph, TipPositions,
 };
 pub use network_render::catmull_rom;
+pub use terrain_render::{terrain_base_color, terrain_type_index};
 
 pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Material2dPlugin::<terrain_render::TerrainMaterial>::default())
+        app.add_plugins(TilemapPlugin)
             .add_plugins(Material2dPlugin::<atmosphere::VignetteMaterial>::default())
             .add_plugins(Material2dPlugin::<network_render::NetworkMaterial>::default())
             .init_resource::<assets::EntitySprites>()
-            .init_resource::<terrain_render::TerrainSpriteMap>()
+            .init_resource::<terrain_render::PendingAtlasCheck>()
             .init_resource::<BranchGraph>()
             .init_resource::<TipPositions>()
             .init_resource::<RegionHulls>()
@@ -46,6 +49,7 @@ impl Plugin for RenderPlugin {
                 (
                     data_layer::extract_priority_bias_map,
                     data_layer::extract_selected_region_tiles,
+                    terrain_render::assert_atlas_addresses_all_terrains,
                 ),
             )
             .add_systems(
@@ -54,14 +58,13 @@ impl Plugin for RenderPlugin {
                     assets::load_entity_sprites,
                     atmosphere::spawn_vignette,
                     atmosphere::spawn_particle_pool,
+                    terrain_render::spawn_terrain_tilemap.after(terrain_generation),
                 ),
             )
             .add_systems(
                 PostUpdate,
                 (
-                    terrain_render::terrain_render_system,
-                    terrain_render::terrain_discovery_update_system
-                        .after(terrain_render::terrain_render_system),
+                    terrain_render::terrain_tile_update_system,
                     network_render::network_render_system,
                     entity_render::tip_render_system,
                     (

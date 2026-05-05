@@ -7,4 +7,6 @@ license-file.workspace = true
 [dependencies]
 bevy = { workspace = true }
 hexx = { workspace = true }
+bevy_ecs_tilemap = { workspace = true }
 fungai_core = { workspace = true }
+fungai_world = { workspace = true }

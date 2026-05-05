@@ -1,50 +1,35 @@
-use std::collections::HashMap;
-
-use bevy::{
-    ecs::system::SystemParam,
-    prelude::*,
-    reflect::TypePath,
-    render::render_resource::{AsBindGroup, ShaderType},
-    shader::ShaderRef,
-    sprite_render::Material2d,
+use bevy::prelude::*;
+use bevy_ecs_tilemap::prelude::*;
+use fungai_core::{
+    GridPos, GridWorld, Hex, HexLayout, HexOrientation, OffsetHexMode, TerrainType, Tile,
 };
-use fungai_core::*;
-use hexx::PlaneMeshBuilder;
 
-#[derive(Resource, Default, Debug)]
-pub struct TerrainSpriteMap {
-    pub sprites: HashMap<Hex, Entity>,
-}
+use crate::data_layer::DiscoveryMap;
 
-/// Packed uniform struct -- matches the WGSL `TerrainUniforms` struct exactly.
-#[derive(ShaderType, Debug, Clone)]
-pub struct TerrainUniforms {
-    pub base_color: LinearRgba, // vec4<f32> -- 16 bytes
-    pub terrain_type: u32,      // u32 -- 4 bytes
-    pub grid_x: u32,            // u32 -- 4 bytes (axial q coordinate, used for noise seed)
-    pub grid_y: u32,            // u32 -- 4 bytes (axial r coordinate, used for noise seed)
-    pub discovered: f32,        // f32 -- 4 bytes
-    pub time: f32,              // f32 -- 4 bytes
-    pub nutrient_level: f32,    // f32 -- 4 bytes
-    pub _padding: f32,          // pad to 16-byte boundary -- 4 bytes
-}
+const MAP_WIDTH: u32 = 80;
+const MAP_HEIGHT: u32 = 60;
 
-#[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
-pub struct TerrainMaterial {
-    #[uniform(0)]
-    pub uniforms: TerrainUniforms,
-}
+const ATLAS_PATH: &str = "sprites/terrain/terrain_atlas.png";
 
-impl Material2d for TerrainMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/terrain.wgsl".into()
-    }
-}
+// Cell size in the atlas PNG. `bevy_ecs_tilemap` samples one of these per tile.
+const TILE_PX_W: f32 = 49.0; // matches the generator's TILE_W
+const TILE_PX_H: f32 = 56.0;
 
-#[derive(Component)]
-pub struct TerrainMeshTile {
-    pub grid_pos: Hex,
-}
+// Spacing between tile centers in world space. Must match hexx's column / row
+// strides for scale=28 pointy-top so other layers (splines, sprites, highlights)
+// don't drift relative to the terrain — the gap is ~0.5px per column, which
+// would compound to ~40px across the 80-column grid.
+const GRID_PX_W: f32 = 28.0 * 1.732_050_8;
+const GRID_PX_H: f32 = 56.0;
+
+/// One row per `TerrainType` variant. Checked against the atlas at runtime
+/// in `assert_atlas_addresses_all_terrains`.
+const REQUIRED_TERRAIN_INDICES: u32 = 7;
+
+const TERRAIN_Z: f32 = -10.0;
+
+const VISIBLE: LinearRgba = LinearRgba::new(1.0, 1.0, 1.0, 1.0);
+const HIDDEN: LinearRgba = LinearRgba::new(0.18, 0.18, 0.22, 1.0);
 
 pub fn terrain_base_color(terrain: TerrainType) -> LinearRgba {
     match terrain {
@@ -70,116 +55,185 @@ pub fn terrain_type_index(terrain: TerrainType) -> u32 {
     }
 }
 
-/// Build a 2D hex mesh from the layout. Uses `PlaneMeshBuilder` with Z-facing
-/// orientation so the hex lies flat on the XY plane for Bevy 2D.
-fn build_hex_mesh(layout: &HexLayout) -> Mesh {
-    let mesh_info = PlaneMeshBuilder::new(layout).facing(Vec3::Z).build();
-
-    Mesh::new(
-        bevy::mesh::PrimitiveTopology::TriangleList,
-        bevy::asset::RenderAssetUsages::default(),
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, mesh_info.vertices)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, mesh_info.normals)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, mesh_info.uvs)
-    .with_inserted_indices(bevy::mesh::Indices::U16(mesh_info.indices))
+/// Convert a `hexx` axial coordinate to a `bevy_ecs_tilemap` `TilePos`,
+/// keeping `OffsetHexMode::Odd` parity via `to_offset_coordinates`.
+/// Returns `None` for negative offsets: `TilePos` is `u32`-indexed and a
+/// wrapping cast would point at a phantom cell far outside the grid.
+pub fn hex_to_tile_pos(hex: Hex) -> Option<TilePos> {
+    let [col, row] = hex.to_offset_coordinates(OffsetHexMode::Odd, HexOrientation::Pointy);
+    if col < 0 || row < 0 {
+        return None;
+    }
+    Some(TilePos {
+        x: col as u32,
+        y: row as u32,
+    })
 }
 
-#[derive(SystemParam)]
-pub struct TerrainAssets<'w> {
-    sprite_map: ResMut<'w, TerrainSpriteMap>,
-    meshes: ResMut<'w, Assets<Mesh>>,
-    materials: ResMut<'w, Assets<TerrainMaterial>>,
+fn discovery_color(level: f32) -> Color {
+    HIDDEN.mix(&VISIBLE, level).into()
 }
 
-pub fn terrain_render_system(
+fn tile_color_for(discovery: &DiscoveryMap, hex: Hex) -> Color {
+    let level = discovery.discovered.get(&hex).copied().unwrap_or(0.0);
+    discovery_color(level)
+}
+
+/// Holds the atlas handle so `assert_atlas_addresses_all_terrains` can re-read
+/// the image once Bevy's async loader populates `Assets<Image>`. Cleared once
+/// the check passes.
+#[derive(Resource, Default)]
+pub struct PendingAtlasCheck(pub Option<Handle<Image>>);
+
+pub fn spawn_terrain_tilemap(
     mut commands: Commands,
-    tiles: Query<(&GridPos, &Tile), Changed<Tile>>,
-    mut assets: TerrainAssets,
-    time: Res<Time>,
-    discovery: Res<crate::data_layer::DiscoveryMap>,
+    asset_server: Res<AssetServer>,
+    grid: Res<GridWorld>,
     layout: Res<HexLayout>,
+    discovery: Res<DiscoveryMap>,
+    tiles: Query<&Tile>,
+    mut pending: ResMut<PendingAtlasCheck>,
 ) {
-    for (gpos, tile) in tiles.iter() {
-        if let Some(old_entity) = assets.sprite_map.sprites.remove(&gpos.0) {
-            commands.entity(old_entity).despawn();
+    let texture: Handle<Image> = asset_server.load(ATLAS_PATH);
+    pending.0 = Some(texture.clone());
+
+    let map_size = TilemapSize {
+        x: MAP_WIDTH,
+        y: MAP_HEIGHT,
+    };
+    let tile_size = TilemapTileSize {
+        x: TILE_PX_W,
+        y: TILE_PX_H,
+    };
+    let grid_size = TilemapGridSize {
+        x: GRID_PX_W,
+        y: GRID_PX_H,
+    };
+    let map_type = TilemapType::Hexagon(HexCoordSystem::RowOdd);
+
+    let tilemap_entity = commands.spawn_empty().id();
+    let mut storage = TileStorage::empty(map_size);
+
+    // Decorate each existing simulation entity with a TileBundle. Skip hexes
+    // whose offset coordinates fall outside the rectangular tilemap bounds —
+    // `TileStorage::set` indexes a flat Vec and would multiply-overflow on
+    // wrapped u32 values.
+    for (&hex, &entity) in &grid.tiles {
+        let Ok(tile) = tiles.get(entity) else {
+            continue;
+        };
+        let Some(tp) = hex_to_tile_pos(hex) else {
+            continue;
+        };
+        if tp.x >= map_size.x || tp.y >= map_size.y {
+            continue;
         }
-
-        let base_color = terrain_base_color(tile.terrain);
-        let t_index = terrain_type_index(tile.terrain);
-
-        let base_pos = layout.hex_to_world_pos(gpos.0);
-        let world_pos = Vec3::new(base_pos.x, base_pos.y, 0.0);
-
-        let material = assets.materials.add(TerrainMaterial {
-            uniforms: TerrainUniforms {
-                base_color,
-                terrain_type: t_index,
-                grid_x: gpos.0.x as u32,
-                grid_y: gpos.0.y as u32,
-                discovered: discovery.discovered.get(&gpos.0).copied().unwrap_or(0.0),
-                time: time.elapsed_secs(),
-                nutrient_level: tile.nutrient_level,
-                _padding: 0.0,
-            },
+        commands.entity(entity).insert(TileBundle {
+            position: tp,
+            tilemap_id: TilemapId(tilemap_entity),
+            texture_index: TileTextureIndex(terrain_type_index(tile.terrain)),
+            color: TileColor(tile_color_for(&discovery, hex)),
+            ..Default::default()
         });
+        storage.set(&tp, entity);
+    }
 
-        let entity = commands
-            .spawn((
-                TerrainMeshTile { grid_pos: gpos.0 },
-                Mesh2d(assets.meshes.add(build_hex_mesh(&layout))),
-                MeshMaterial2d(material),
-                Transform::from_translation(world_pos).with_scale(Vec3::splat(1.01)),
-            ))
-            .id();
-        assets.sprite_map.sprites.insert(gpos.0, entity);
+    // Align tilemap world space with hexx world space. `center_in_world` is
+    // tilemap-local; `hex_to_world_pos` is the engine-wide truth. Translate
+    // the tilemap so the two agree at Hex::ZERO.
+    let zero_tp = hex_to_tile_pos(Hex::ZERO).expect("Hex::ZERO is in-bounds");
+    let local = zero_tp.center_in_world(
+        &map_size,
+        &grid_size,
+        &tile_size,
+        &map_type,
+        &TilemapAnchor::None,
+    );
+    let world = layout.hex_to_world_pos(Hex::ZERO);
+    let origin = (world - local).extend(TERRAIN_Z);
+
+    commands.entity(tilemap_entity).insert(TilemapBundle {
+        size: map_size,
+        storage,
+        texture: TilemapTexture::Single(texture),
+        tile_size,
+        grid_size,
+        map_type,
+        anchor: TilemapAnchor::None,
+        transform: Transform::from_translation(origin),
+        ..Default::default()
+    });
+}
+
+// `ParamSet` is the only way to overlap two `&mut TileColor` queries; the
+// combined type is wide enough to trip `type_complexity`. Suppress here so
+// the workspace lint stays strict for systems that don't need the escape.
+#[allow(clippy::type_complexity)]
+pub fn terrain_tile_update_system(
+    mut sets: ParamSet<(
+        Query<(&Tile, &GridPos, &mut TileTextureIndex, &mut TileColor), Changed<Tile>>,
+        Query<(&GridPos, &mut TileColor)>,
+    )>,
+    discovery: Res<DiscoveryMap>,
+    untiled: Query<Entity, (With<Tile>, Without<TilePos>)>,
+    mut warned_untiled: Local<bool>,
+) {
+    // Warn exactly once if a tile entity lacks a TilePos — a stale spawn loop
+    // would otherwise emit thousands of warnings per frame.
+    if !*warned_untiled && let Some(entity) = untiled.iter().next() {
+        warn!(
+            "terrain_tile_update_system: entity {entity:?} has Tile but no TilePos -- \
+             spawn_terrain_tilemap likely ran before terrain_generation populated GridWorld"
+        );
+        *warned_untiled = true;
+    }
+
+    // Path 1: per-changed-tile texture index + color refresh.
+    for (tile, gpos, mut idx, mut color) in &mut sets.p0() {
+        idx.0 = terrain_type_index(tile.terrain);
+        color.0 = tile_color_for(&discovery, gpos.0);
+    }
+
+    // Path 2: discovery sweep, exactly once per sim tick when DiscoveryMap mutates.
+    if discovery.is_changed() {
+        for (gpos, mut color) in &mut sets.p1() {
+            color.0 = tile_color_for(&discovery, gpos.0);
+        }
     }
 }
 
-/// Updates discovery and time uniforms on existing terrain materials each frame.
-pub fn terrain_discovery_update_system(
-    tiles: Query<(&TerrainMeshTile, &MeshMaterial2d<TerrainMaterial>)>,
-    mut materials: ResMut<Assets<TerrainMaterial>>,
-    discovery: Res<crate::data_layer::DiscoveryMap>,
-    time: Res<Time>,
+/// Verify the atlas can address all `REQUIRED_TERRAIN_INDICES` once it
+/// lands in `Assets<Image>`, and panic if not. Asset loads are async, so
+/// this re-runs every Update until the handle resolves, then clears it.
+pub fn assert_atlas_addresses_all_terrains(
+    mut pending: ResMut<PendingAtlasCheck>,
+    images: Res<Assets<Image>>,
 ) {
-    let elapsed = time.elapsed_secs();
-    for (tile, mat_handle) in tiles.iter() {
-        if let Some(mat) = materials.get_mut(&mat_handle.0) {
-            mat.uniforms.discovered = discovery
-                .discovered
-                .get(&tile.grid_pos)
-                .copied()
-                .unwrap_or(0.0);
-            mat.uniforms.time = elapsed;
-        }
-    }
+    let Some(handle) = pending.0.as_ref() else {
+        return;
+    };
+    let Some(image) = images.get(handle) else {
+        return;
+    };
+    let w = image.texture_descriptor.size.width;
+    let h = image.texture_descriptor.size.height;
+    let cols = w / TILE_PX_W as u32;
+    let rows = h / TILE_PX_H as u32;
+    let addressable = cols.saturating_mul(rows);
+    assert!(
+        addressable >= REQUIRED_TERRAIN_INDICES,
+        "terrain atlas is too small: {w}x{h} px / {tw}x{th} tile = {addressable} indices, \
+         need at least {req} for all TerrainType variants",
+        tw = TILE_PX_W as u32,
+        th = TILE_PX_H as u32,
+        req = REQUIRED_TERRAIN_INDICES,
+    );
+    pending.0 = None;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::MinimalPlugins;
-    use bevy::asset::AssetPlugin;
-    use bevy::sprite_render::Material2dPlugin;
-
-    #[test]
-    fn terrain_material_stores_uniforms() {
-        let uniforms = TerrainUniforms {
-            base_color: LinearRgba::new(0.45, 0.32, 0.18, 1.0),
-            terrain_type: 0,
-            grid_x: 5,
-            grid_y: 10,
-            discovered: 1.0,
-            time: 0.0,
-            nutrient_level: 0.5,
-            _padding: 0.0,
-        };
-        let mat = TerrainMaterial { uniforms };
-        assert_eq!(mat.uniforms.terrain_type, 0);
-        assert_eq!(mat.uniforms.grid_x, 5);
-        assert_eq!(mat.uniforms.grid_y, 10);
-    }
 
     #[test]
     fn terrain_base_color_returns_dark_palette() {
@@ -192,39 +246,274 @@ mod tests {
         assert!(water.blue > water.red);
         assert!(water.blue > water.green);
     }
+}
 
-    #[test]
-    fn terrain_render_spawns_mesh2d_entities() {
+#[cfg(test)]
+mod tilemap_tests {
+    use super::*;
+    use bevy::MinimalPlugins;
+    use bevy::asset::AssetPlugin;
+    use bevy::image::ImagePlugin;
+    use fungai_core::{
+        GridPos, GridWorld, Hex, HexOrientation, OffsetHexMode, TerrainType, Tile,
+        create_hex_layout,
+    };
+    // NOTE: `super::*` exposes only items actually defined in `terrain_render.rs`;
+    // names brought in via `use fungai_core::{...}` at the top of that file are
+    // private and do NOT leak through `super::*`. List every type used below
+    // explicitly.
+
+    fn test_app() -> App {
         let mut app = App::new();
-        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
-        app.add_plugins(bevy::mesh::MeshPlugin);
-        app.add_plugins(Material2dPlugin::<TerrainMaterial>::default());
+        app.add_plugins((
+            MinimalPlugins,
+            AssetPlugin::default(),
+            ImagePlugin::default(),
+        ));
+        // TilemapPlugin pulls in `TilemapRenderingPlugin`, which calls
+        // `app.sub_app_mut(RenderApp)` and panics in headless tests. Our tests
+        // only mutate Tile* components directly and read tilemap-component
+        // values back; they don't need the render pipeline. Skip the plugin.
         app.init_resource::<GridWorld>();
-        app.init_resource::<RegionStates>();
-        app.init_resource::<TerrainSpriteMap>();
         app.init_resource::<crate::data_layer::DiscoveryMap>();
+        app.init_resource::<PendingAtlasCheck>();
         app.insert_resource(create_hex_layout());
+        // Deliberately do NOT register `extract_discovery_map`: it calls
+        // `discovered.clear()` every Update tick (data_layer.rs), which would
+        // erase the manual inserts these tests rely on. The system under test
+        // (`terrain_tile_update_system`) reads `Res<DiscoveryMap>` directly, so
+        // mutating the resource via `resource_mut` is sufficient to flip its
+        // change tick and drive Path 2.
+        app
+    }
 
-        let pos = Hex::new(3, 4);
+    fn spawn_grid_tile(app: &mut App, hex: Hex, terrain: TerrainType) -> Entity {
         let e = app
             .world_mut()
             .spawn((
-                GridPos(pos),
+                GridPos(hex),
                 Tile {
-                    terrain: TerrainType::Rock,
-                    ..default()
+                    terrain,
+                    ..Default::default()
                 },
             ))
             .id();
         app.world_mut()
             .resource_mut::<GridWorld>()
             .tiles
-            .insert(pos, e);
+            .insert(hex, e);
+        e
+    }
 
-        app.add_systems(PostUpdate, terrain_render_system);
+    #[test]
+    fn hex_to_tile_pos_round_trips() {
+        // Origin (== from_offset([0, 0])), the centre, and the four corners of
+        // the 80x60 grid. `Hex::ZERO` and `from_offset([0, 0], Odd, Pointy)`
+        // collapse to the same axial value, so only one of them is included.
+        let samples = [
+            Hex::ZERO,
+            Hex::from_offset_coordinates([40, 30], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([79, 0], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([0, 59], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([79, 59], OffsetHexMode::Odd, HexOrientation::Pointy),
+        ];
+        for h in samples {
+            let tp = hex_to_tile_pos(h).expect("test hex must be in-bounds");
+            let back = Hex::from_offset_coordinates(
+                [tp.x as i32, tp.y as i32],
+                OffsetHexMode::Odd,
+                HexOrientation::Pointy,
+            );
+            assert_eq!(back, h, "round-trip failed for {h:?}");
+        }
+    }
+
+    #[test]
+    fn tilemap_spawns_tile_for_each_hex() {
+        let mut app = test_app();
+        // All four positions must produce non-negative offset coordinates so
+        // they fit the rectangular 80x60 TileStorage. Hex::new(2, -1) (which
+        // the plan originally listed) maps to offset row=-1 and overflows the
+        // u32 cast inside TileStorage::get; the diagonal Hex::new(2, 1) gives
+        // offset (col=2, row=1) and exercises the same "non-axis-aligned"
+        // case without going out of bounds.
+        let positions = [Hex::ZERO, Hex::new(1, 0), Hex::new(0, 1), Hex::new(2, 1)];
+        for &p in &positions {
+            spawn_grid_tile(&mut app, p, TerrainType::Soil);
+        }
+
+        app.add_systems(Startup, spawn_terrain_tilemap);
         app.update();
 
-        let sprite_map = app.world().resource::<TerrainSpriteMap>();
-        assert!(sprite_map.sprites.contains_key(&pos));
+        // Exactly one TileStorage on the tilemap entity, populated for every hex.
+        let mut q = app.world_mut().query::<&TileStorage>();
+        let storage = q.iter(app.world()).next().expect("TileStorage exists");
+        let mut found = 0;
+        for &p in &positions {
+            let tp = hex_to_tile_pos(p).expect("test hex must be in-bounds");
+            if storage.get(&tp).is_some() {
+                found += 1;
+            }
+        }
+        assert_eq!(
+            found,
+            positions.len(),
+            "every hex should appear in TileStorage"
+        );
+    }
+
+    #[test]
+    fn terrain_tile_update_changes_texture_index() {
+        let mut app = test_app();
+        let pos = Hex::new(2, 3);
+        let entity = spawn_grid_tile(&mut app, pos, TerrainType::Soil);
+
+        app.add_systems(Startup, spawn_terrain_tilemap);
+        app.add_systems(PostUpdate, terrain_tile_update_system);
+        app.update();
+
+        // Flip terrain → the next update should mutate TileTextureIndex.
+        app.world_mut().get_mut::<Tile>(entity).unwrap().terrain = TerrainType::Rock;
+        app.update();
+
+        let idx = app
+            .world()
+            .get::<TileTextureIndex>(entity)
+            .expect("tile has index");
+        assert_eq!(idx.0, terrain_type_index(TerrainType::Rock));
+    }
+
+    #[test]
+    fn discovery_drives_tile_color() {
+        let mut app = test_app();
+        let pos = Hex::new(4, 4);
+        let entity = spawn_grid_tile(&mut app, pos, TerrainType::Soil);
+
+        app.add_systems(Startup, spawn_terrain_tilemap);
+        app.add_systems(PostUpdate, terrain_tile_update_system);
+        app.update();
+
+        let dark = app
+            .world()
+            .get::<TileColor>(entity)
+            .copied()
+            .expect("color exists");
+
+        app.world_mut()
+            .resource_mut::<crate::data_layer::DiscoveryMap>()
+            .discovered
+            .insert(pos, 1.0);
+        app.update();
+
+        let lit = app
+            .world()
+            .get::<TileColor>(entity)
+            .copied()
+            .expect("color exists");
+        let dark_rgba: Color = dark.0;
+        let lit_rgba: Color = lit.0;
+        assert!(
+            lit_rgba.to_linear().red > dark_rgba.to_linear().red,
+            "discovered tile should be brighter"
+        );
+    }
+
+    #[test]
+    fn tilemap_world_pos_aligns_with_hex_layout() {
+        let mut app = test_app();
+        let layout = create_hex_layout();
+        // The plan originally listed Hex::new(-1, 0) and Hex::new(0, -1)
+        // among the canonical samples, but both produce offset coordinates
+        // with negative components. `hex_to_tile_pos` casts those to u32 and
+        // `tp.center_in_world` then computes nonsense world positions.
+        // Production never sees negative-offset hexes (the 80x60 grid is
+        // strictly non-negative), so checking alignment only on in-bounds
+        // hexes here matches the geometry the renderer actually serves.
+        let canonical = [
+            Hex::ZERO,
+            Hex::new(1, 0),
+            Hex::new(0, 1),
+            Hex::from_offset_coordinates([0, 0], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([79, 0], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([0, 59], OffsetHexMode::Odd, HexOrientation::Pointy),
+            Hex::from_offset_coordinates([79, 59], OffsetHexMode::Odd, HexOrientation::Pointy),
+        ];
+        for &h in &canonical {
+            spawn_grid_tile(&mut app, h, TerrainType::Soil);
+        }
+
+        app.add_systems(Startup, spawn_terrain_tilemap);
+        app.update();
+
+        let (tilemap_transform, tilemap_size, grid_size, tile_size, map_type) = {
+            let mut q = app.world_mut().query::<(
+                &Transform,
+                &TilemapSize,
+                &TilemapGridSize,
+                &TilemapTileSize,
+                &TilemapType,
+            )>();
+            let (t, s, g, ts, m) = q.iter(app.world()).next().expect("tilemap exists");
+            (*t, *s, *g, *ts, *m)
+        };
+
+        for &h in &canonical {
+            let expected = layout.hex_to_world_pos(h);
+            let tp = hex_to_tile_pos(h).expect("canonical hex must be in-bounds");
+            let local = tp.center_in_world(
+                &tilemap_size,
+                &grid_size,
+                &tile_size,
+                &map_type,
+                &TilemapAnchor::None,
+            );
+            let actual = tilemap_transform.translation.truncate() + local;
+            let diff = (actual - expected).length();
+            assert!(
+                diff < 1.0,
+                "hex {h:?} drifts by {diff}px (expected={expected:?}, actual={actual:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn discovery_applies_to_correct_neighbors() {
+        // Even-row vs odd-row neighbour parity. With OffsetHexMode::Odd +
+        // HexCoordSystem::RowOdd, lighting hex H must light H, not H's
+        // row-shifted lookalike.
+        let mut app = test_app();
+        let target =
+            Hex::from_offset_coordinates([5, 4], OffsetHexMode::Odd, HexOrientation::Pointy);
+        let other =
+            Hex::from_offset_coordinates([5, 5], OffsetHexMode::Odd, HexOrientation::Pointy);
+
+        let target_e = spawn_grid_tile(&mut app, target, TerrainType::Soil);
+        let other_e = spawn_grid_tile(&mut app, other, TerrainType::Soil);
+
+        app.add_systems(Startup, spawn_terrain_tilemap);
+        app.add_systems(PostUpdate, terrain_tile_update_system);
+        app.update();
+
+        let baseline_target = app.world().get::<TileColor>(target_e).copied().unwrap();
+        let baseline_other = app.world().get::<TileColor>(other_e).copied().unwrap();
+
+        app.world_mut()
+            .resource_mut::<crate::data_layer::DiscoveryMap>()
+            .discovered
+            .insert(target, 1.0);
+        app.update();
+
+        let lit_target = app.world().get::<TileColor>(target_e).copied().unwrap();
+        let lit_other = app.world().get::<TileColor>(other_e).copied().unwrap();
+
+        assert!(
+            lit_target.0.to_linear().red > baseline_target.0.to_linear().red,
+            "target hex should brighten"
+        );
+        assert_eq!(
+            lit_other.0.to_linear().red,
+            baseline_other.0.to_linear().red,
+            "neighbour with same offset col but different row must NOT brighten"
+        );
     }
 }
