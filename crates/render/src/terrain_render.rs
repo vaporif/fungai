@@ -76,6 +76,11 @@ fn discovery_color(level: f32) -> Color {
     HIDDEN.mix(&VISIBLE, level).into()
 }
 
+fn tile_color_for(discovery: &DiscoveryMap, hex: Hex) -> Color {
+    let level = discovery.discovered.get(&hex).copied().unwrap_or(0.0);
+    discovery_color(level)
+}
+
 /// Holds the atlas handle so `assert_atlas_addresses_all_terrains` can re-read
 /// the image once Bevy's async loader has populated `Assets<Image>`. Cleared
 /// after the assertion fires.
@@ -126,12 +131,11 @@ pub fn spawn_terrain_tilemap(
         if tp.x >= map_size.x || tp.y >= map_size.y {
             continue;
         }
-        let level = discovery.discovered.get(&hex).copied().unwrap_or(0.0);
         commands.entity(entity).insert(TileBundle {
             position: tp,
             tilemap_id: TilemapId(tilemap_entity),
             texture_index: TileTextureIndex(terrain_type_index(tile.terrain)),
-            color: TileColor(discovery_color(level)),
+            color: TileColor(tile_color_for(&discovery, hex)),
             ..Default::default()
         });
         storage.set(&tp, entity);
@@ -192,15 +196,13 @@ pub fn terrain_tile_update_system(
     // Path 1: per-changed-tile texture index + color refresh.
     for (tile, gpos, mut idx, mut color) in &mut sets.p0() {
         idx.0 = terrain_type_index(tile.terrain);
-        let level = discovery.discovered.get(&gpos.0).copied().unwrap_or(0.0);
-        color.0 = discovery_color(level);
+        color.0 = tile_color_for(&discovery, gpos.0);
     }
 
     // Path 2: discovery sweep, exactly once per sim tick when DiscoveryMap mutates.
     if discovery.is_changed() {
         for (gpos, mut color) in &mut sets.p1() {
-            let level = discovery.discovered.get(&gpos.0).copied().unwrap_or(0.0);
-            color.0 = discovery_color(level);
+            color.0 = tile_color_for(&discovery, gpos.0);
         }
     }
 }
