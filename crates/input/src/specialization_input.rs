@@ -1,29 +1,32 @@
 use bevy::prelude::*;
 use fungai_core::{RegionStates, SpecializationType};
+use leafwing_input_manager::prelude::*;
 
 use crate::SelectedRegion;
+use crate::action::Action;
 
-/// Keys 1-8 assign a target specialization to the selected region.
+/// Keys 1-8 (mapped via `Action::Spec1..Spec8`) assign a target specialization
+/// to the selected region.
 pub fn specialization_input_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    actions: Res<ActionState<Action>>,
     selected: Res<SelectedRegion>,
     mut region_states: ResMut<RegionStates>,
 ) {
-    const KEY_SPECS: &[(KeyCode, SpecializationType)] = &[
-        (KeyCode::Digit1, SpecializationType::Decomposer),
-        (KeyCode::Digit2, SpecializationType::Parasite),
-        (KeyCode::Digit3, SpecializationType::Symbiont),
-        (KeyCode::Digit4, SpecializationType::Explorer),
-        (KeyCode::Digit5, SpecializationType::Hunter),
-        (KeyCode::Digit6, SpecializationType::Transporter),
-        (KeyCode::Digit7, SpecializationType::Infiltrator),
-        (KeyCode::Digit8, SpecializationType::Researcher),
+    const ACTION_SPECS: &[(Action, SpecializationType)] = &[
+        (Action::Spec1, SpecializationType::Decomposer),
+        (Action::Spec2, SpecializationType::Parasite),
+        (Action::Spec3, SpecializationType::Symbiont),
+        (Action::Spec4, SpecializationType::Explorer),
+        (Action::Spec5, SpecializationType::Hunter),
+        (Action::Spec6, SpecializationType::Transporter),
+        (Action::Spec7, SpecializationType::Infiltrator),
+        (Action::Spec8, SpecializationType::Researcher),
     ];
 
-    let Some(target) = KEY_SPECS
+    let Some(target) = ACTION_SPECS
         .iter()
         .copied()
-        .find_map(|(key, spec)| keyboard.just_pressed(key).then_some(spec))
+        .find_map(|(action, spec)| actions.just_pressed(&action).then_some(spec))
     else {
         return;
     };
