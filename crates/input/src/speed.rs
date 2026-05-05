@@ -2,15 +2,18 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use fungai_core::{SimulationSpeed, TickTimer};
+use leafwing_input_manager::prelude::*;
+
+use crate::action::Action;
 
 pub fn speed_input_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    actions: Res<ActionState<Action>>,
     mut speed: ResMut<SimulationSpeed>,
     mut tick_timer: ResMut<TickTimer>,
 ) {
     let mut changed = false;
 
-    if keyboard.just_pressed(KeyCode::Space) {
+    if actions.just_pressed(&Action::TogglePause) {
         *speed = if speed.is_paused() {
             SimulationSpeed::Normal
         } else {
@@ -19,12 +22,12 @@ pub fn speed_input_system(
         changed = true;
     }
 
-    if keyboard.just_pressed(KeyCode::Equal) || keyboard.just_pressed(KeyCode::NumpadAdd) {
+    if actions.just_pressed(&Action::SpeedUp) {
         *speed = speed.speed_up();
         changed = true;
     }
 
-    if keyboard.just_pressed(KeyCode::Minus) || keyboard.just_pressed(KeyCode::NumpadSubtract) {
+    if actions.just_pressed(&Action::SlowDown) {
         *speed = speed.slow_down();
         changed = true;
     }
@@ -39,28 +42,28 @@ pub fn speed_input_system(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::input::InputPlugin as BevyInputPlugin;
+
+    use crate::action::{Action, default_input_map};
 
     fn setup_app(initial_speed: SimulationSpeed) -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        app.add_plugins(BevyInputPlugin);
+        app.add_plugins(InputManagerPlugin::<Action>::default());
+        app.insert_resource(default_input_map());
+        app.init_resource::<ActionState<Action>>();
         app.insert_resource(initial_speed);
         app.insert_resource(TickTimer::default());
-        app.insert_resource(ButtonInput::<KeyCode>::default());
         app.add_systems(Update, speed_input_system);
         app
-    }
-
-    fn press_key(app: &mut App, key: KeyCode) {
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(key);
-        app.update();
     }
 
     #[test]
     fn space_toggles_pause() {
         let mut app = setup_app(SimulationSpeed::Normal);
-        press_key(&mut app, KeyCode::Space);
+        KeyCode::Space.press(app.world_mut());
+        app.update();
         assert_eq!(
             *app.world().resource::<SimulationSpeed>(),
             SimulationSpeed::Paused
@@ -70,7 +73,8 @@ mod tests {
     #[test]
     fn plus_speeds_up() {
         let mut app = setup_app(SimulationSpeed::Normal);
-        press_key(&mut app, KeyCode::Equal);
+        KeyCode::Equal.press(app.world_mut());
+        app.update();
         assert_eq!(
             *app.world().resource::<SimulationSpeed>(),
             SimulationSpeed::Fast
@@ -80,7 +84,8 @@ mod tests {
     #[test]
     fn minus_slows_down() {
         let mut app = setup_app(SimulationSpeed::Fast);
-        press_key(&mut app, KeyCode::Minus);
+        KeyCode::Minus.press(app.world_mut());
+        app.update();
         assert_eq!(
             *app.world().resource::<SimulationSpeed>(),
             SimulationSpeed::Normal
