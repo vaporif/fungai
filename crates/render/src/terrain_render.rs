@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy::{
     ecs::system::SystemParam,
     prelude::*,
@@ -8,6 +10,11 @@ use bevy::{
 };
 use fungai_core::*;
 use hexx::PlaneMeshBuilder;
+
+#[derive(Resource, Default, Debug)]
+pub struct TerrainSpriteMap {
+    pub sprites: HashMap<Hex, Entity>,
+}
 
 /// Packed uniform struct -- matches the WGSL `TerrainUniforms` struct exactly.
 #[derive(ShaderType, Debug, Clone)]

@@ -516,4 +516,39 @@ mod tests {
         assert_eq!(graph.nodes.len(), 3);
         assert_eq!(graph.edges.len(), 2);
     }
+
+    #[test]
+    fn extract_branch_graph_does_not_run_outside_simulation_set() {
+        use fungai_core::SimulationSet;
+
+        let mut app = test_app();
+        app.configure_sets(Update, SimulationSet.run_if(|| false));
+        app.add_systems(Update, extract_branch_graph.in_set(SimulationSet));
+
+        let rid = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+        let pos = Hex::ZERO;
+        let e = app
+            .world_mut()
+            .spawn((
+                GridPos(pos),
+                Tile {
+                    occupant: Occupant::Player(rid),
+                    biomass: 1.0,
+                    ..default()
+                },
+            ))
+            .id();
+        app.world_mut()
+            .resource_mut::<GridWorld>()
+            .tiles
+            .insert(pos, e);
+
+        app.update();
+
+        let graph = app.world().resource::<BranchGraph>();
+        assert!(graph.nodes.is_empty(), "system ran despite gate");
+    }
 }

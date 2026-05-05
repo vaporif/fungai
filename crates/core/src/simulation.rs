@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-
 use bevy::prelude::*;
-
-use crate::grid::Hex;
 
 #[derive(Resource)]
 pub struct TickTimer {
@@ -109,20 +105,6 @@ impl GameState {
         self.fragments_fused >= self.fragments_total
             && self.mushrooms_fruited >= self.mushrooms_required
             && self.fragments_total > 0
-    }
-}
-
-#[derive(Resource, Default, Debug)]
-pub struct TerrainSpriteMap {
-    pub sprites: HashMap<Hex, Entity>,
-}
-
-#[derive(Resource, Debug, Reflect)]
-pub struct HintsVisible(pub bool);
-
-impl Default for HintsVisible {
-    fn default() -> Self {
-        Self(true)
     }
 }
 

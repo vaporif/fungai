@@ -2,10 +2,7 @@ use bevy::ecs::message::Message;
 
 use crate::abilities::UnlockPool;
 use crate::grid::Hex;
-use crate::region::RegionId;
 use crate::tile::{FragmentId, TileContents};
-
-use super::abilities::UnlockOption;
 
 #[derive(Message)]
 pub struct TurnAdvanced;
@@ -30,16 +27,4 @@ pub struct DecompositionComplete {
 #[derive(Message)]
 pub struct FragmentFused {
     pub fragment_id: FragmentId,
-}
-
-#[derive(Message)]
-pub struct SlotMachineTriggered {
-    pub pool: UnlockPool,
-    pub options: Vec<UnlockOption>,
-}
-
-#[derive(Message)]
-pub struct NeutralFungiMerged {
-    pub fungus_id: u32,
-    pub region_id: RegionId,
 }

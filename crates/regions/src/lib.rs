@@ -13,8 +13,8 @@ pub use discovery::{
     researcher_study_system,
 };
 pub use fragment::fragment_system;
-pub use mutation::{AppliedMutations, mutation_system};
-pub use slot_machine::{SlotMachineRng, slot_machine_system};
+pub use mutation::{AppliedMutations, MutationSelection, mutation_system};
+pub use slot_machine::{SlotMachineRng, SlotMachineTriggered, slot_machine_system};
 pub use specialization::specialization_system;
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -61,6 +61,7 @@ impl Plugin for UnlockPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SlotMachineRng>()
             .init_resource::<AppliedMutations>()
+            .init_resource::<MutationSelection>()
             .add_systems(
                 Update,
                 (slot_machine_system, mutation_system)
@@ -82,21 +83,22 @@ pub struct RegionsPlugin;
 
 impl Plugin for RegionsPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(
-            Update,
-            (RegionsSystems::Discovery, RegionsSystems::Unlock)
-                .chain()
-                .in_set(SimulationSet),
-        )
-        .configure_sets(
-            Update,
-            (RegionsSystems::Specialization, RegionsSystems::Fragment).in_set(SimulationSet),
-        )
-        .add_plugins((
-            SpecializationPlugin,
-            DiscoveryPlugin,
-            UnlockPlugin,
-            FragmentPlugin,
-        ));
+        app.add_message::<SlotMachineTriggered>()
+            .configure_sets(
+                Update,
+                (RegionsSystems::Discovery, RegionsSystems::Unlock)
+                    .chain()
+                    .in_set(SimulationSet),
+            )
+            .configure_sets(
+                Update,
+                (RegionsSystems::Specialization, RegionsSystems::Fragment).in_set(SimulationSet),
+            )
+            .add_plugins((
+                SpecializationPlugin,
+                DiscoveryPlugin,
+                UnlockPlugin,
+                FragmentPlugin,
+            ));
     }
 }

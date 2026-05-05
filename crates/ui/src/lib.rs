@@ -7,10 +7,10 @@ mod slot_machine_ui;
 mod spec_picker;
 
 pub use ability_bar::{
-    AbilityBarRoot, AbilityButton, SporeButton, ability_click_system, spawn_ability_bar,
-    spore_button_system, update_ability_bar,
+    AbilityBarRoot, AbilityButton, ActiveAbilityEffects, SporeButton, ability_click_system,
+    spawn_ability_bar, spore_button_system, update_ability_bar,
 };
-pub use hud::{spawn_hud, update_hud};
+pub use hud::{HintsVisible, spawn_hud, update_hud};
 pub use slot_machine_ui::{
     SlotMachineState, slot_machine_selection_system, slot_machine_ui_system,
 };
@@ -20,7 +20,8 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_hud)
+        app.init_resource::<HintsVisible>()
+            .add_systems(Startup, spawn_hud)
             .add_systems(Update, update_hud);
     }
 }
@@ -29,14 +30,16 @@ pub struct AbilityBarPlugin;
 
 impl Plugin for AbilityBarPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_ability_bar).add_systems(
-            Update,
-            (
-                update_ability_bar,
-                ability_click_system,
-                spore_button_system,
-            ),
-        );
+        app.init_resource::<ActiveAbilityEffects>()
+            .add_systems(Startup, spawn_ability_bar)
+            .add_systems(
+                Update,
+                (
+                    update_ability_bar,
+                    ability_click_system,
+                    spore_button_system,
+                ),
+            );
     }
 }
 

@@ -9,7 +9,9 @@ mod rival;
 
 pub use combat::combat_resolution_system;
 pub use environment::{EnvironmentRng, environment_threat_system};
-pub use organisms::{bacteria_system, fauna_system, neutral_fungi_system, plant_system};
+pub use organisms::{
+    NeutralFungiMerged, bacteria_system, fauna_system, neutral_fungi_system, plant_system,
+};
 pub use rival::{RivalRng, RivalState, rival_ai_system};
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -71,22 +73,23 @@ pub struct AiPlugin;
 
 impl Plugin for AiPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(
-            Update,
-            (
-                AiSystems::Rival,
-                AiSystems::Organisms,
-                AiSystems::Environment,
-                AiSystems::Combat,
+        app.add_message::<NeutralFungiMerged>()
+            .configure_sets(
+                Update,
+                (
+                    AiSystems::Rival,
+                    AiSystems::Organisms,
+                    AiSystems::Environment,
+                    AiSystems::Combat,
+                )
+                    .chain()
+                    .in_set(SimulationSet),
             )
-                .chain()
-                .in_set(SimulationSet),
-        )
-        .add_plugins((
-            RivalAiPlugin,
-            OrganismsPlugin,
-            EnvironmentPlugin,
-            CombatPlugin,
-        ));
+            .add_plugins((
+                RivalAiPlugin,
+                OrganismsPlugin,
+                EnvironmentPlugin,
+                CombatPlugin,
+            ));
     }
 }

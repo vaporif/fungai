@@ -1,11 +1,28 @@
 use bevy::prelude::*;
 use fungai_core::{
     GridPos, GridWorld, Hex, HyphalTip, MushroomEntity, Occupant, RegionId, RegionStates,
-    SPORE_RELAY_ACCURACY_RADIUS, SporeAction, Tile,
+    SPORE_RELAY_ACCURACY_RADIUS, Tile,
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
 use rand::seq::IteratorRandom;
+
+#[derive(Resource, Debug, Clone, Reflect)]
+pub struct SporeAction {
+    pub cooldown_remaining: u32,
+    pub cooldown_max: u32,
+    pub triggered: bool,
+}
+
+impl Default for SporeAction {
+    fn default() -> Self {
+        Self {
+            cooldown_remaining: 0,
+            cooldown_max: 10,
+            triggered: false,
+        }
+    }
+}
 
 #[derive(Resource)]
 pub struct SporeRng(pub StdRng);
