@@ -264,7 +264,7 @@ git commit -m "input: add leafwing action enum and plugin"
 **Files:**
 - Modify: `crates/input/src/camera.rs`
 
-- [ ] **Step 1: Replace the system signature and body**
+- [x] **Step 1: Replace the system signature and body**
 
 Replace the existing `pub fn camera_system(...)` with:
 
@@ -331,12 +331,12 @@ mod tests {
 
 Note: `axis_pair` already returns a clamped/normalised pair from `VirtualDPad`. Diagonals are unit-length, so the `normalize()` call here mostly handles the WASD-only case where the raw pair is on an axis. Keeping `normalize()` matches the existing constant-speed behavior.
 
-- [ ] **Step 2: Build the crate**
+- [x] **Step 2: Build the crate**
 
 Run: `cargo build -p fungai_input`
 Expected: success.
 
-- [ ] **Step 3: Run unit tests**
+- [x] **Step 3: Run unit tests**
 
 Run: `cargo nextest run -p fungai_input camera`
 Expected: `zoom_range_matches_spec` passes.
@@ -349,12 +349,12 @@ Verify:
 - Arrow keys also pan.
 - Mouse wheel zooms within the 0.15–4.0 range.
 
-- [ ] **Step 5: Lint**
+- [x] **Step 5: Lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 ```
@@ -369,7 +369,7 @@ git commit -m "input: migrate camera_system to ActionState"
 **Files:**
 - Modify: `crates/input/src/selection.rs`
 
-- [ ] **Step 1: Replace mouse field with action state**
+- [x] **Step 1: Replace mouse field with action state**
 
 Replace the file contents with:
 
@@ -436,7 +436,7 @@ pub fn selection_system(
 }
 ```
 
-- [ ] **Step 2: Build the crate**
+- [x] **Step 2: Build the crate**
 
 Run: `cargo build -p fungai_input`
 Expected: success.
@@ -448,12 +448,12 @@ Verify:
 - Left-click on a tile selects it (existing visual feedback updates).
 - Left-click on a UI button does not select a tile underneath.
 
-- [ ] **Step 4: Lint**
+- [x] **Step 4: Lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 ```
@@ -468,7 +468,7 @@ git commit -m "input: migrate selection_system to ActionState"
 **Files:**
 - Modify: `crates/input/src/priority.rs`
 
-- [ ] **Step 1: Rewrite `priority_system`**
+- [x] **Step 1: Rewrite `priority_system`**
 
 Replace the system signature and body (keep `PRIORITY_RADIUS` and the imports for `GridPos`, `HexLayout`, `SelectedRegion`, `Tile`):
 
@@ -521,7 +521,7 @@ pub fn priority_system(
 }
 ```
 
-- [ ] **Step 2: Replace the test module**
+- [x] **Step 2: Replace the test module**
 
 Replace the entire `#[cfg(test)] mod tests { ... }` block with:
 
@@ -631,12 +631,12 @@ Key points:
 - `KeyCode::KeyP.press(app.world_mut())` uses the `Buttonlike::press` trait method (re-exported from `leafwing_input_manager::prelude`) to send the actual `KeyboardInput` message that the leafwing system will turn into a `just_pressed` reading on the next `app.update()`.
 - For the chord test, `ShiftLeft` and `KeyP` are pressed in the same frame so `ButtonlikeChord::modified(ModifierKey::Shift, KeyCode::KeyP)` matches.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 Run: `cargo build -p fungai_input --tests`
 Expected: success.
 
-- [ ] **Step 4: Run priority tests**
+- [x] **Step 4: Run priority tests**
 
 Run: `cargo nextest run -p fungai_input priority`
 Expected: all three tests pass.
@@ -649,12 +649,12 @@ Verify:
 - Press Shift+P → bias clears across the map.
 - Press P with nothing selected → nothing changes.
 
-- [ ] **Step 6: Lint**
+- [x] **Step 6: Lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 ```
@@ -669,7 +669,7 @@ git commit -m "input: migrate priority_system and tests to ActionState"
 **Files:**
 - Modify: `crates/input/src/specialization_input.rs`
 
-- [ ] **Step 1: Replace the system body**
+- [x] **Step 1: Replace the system body**
 
 Replace the file contents with:
 
@@ -718,7 +718,7 @@ pub fn specialization_input_system(
 }
 ```
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 Run: `cargo build -p fungai_input`
 Expected: success.
@@ -730,12 +730,12 @@ Verify:
 - Select a region, press digit `1` → that region's target specialization becomes Decomposer (visible in HUD).
 - Each of `2..8` produces the matching specialization (Parasite, Symbiont, Explorer, Hunter, Transporter, Infiltrator, Researcher).
 
-- [ ] **Step 4: Lint**
+- [x] **Step 4: Lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 ```
@@ -750,7 +750,7 @@ git commit -m "input: migrate specialization_input_system to ActionState"
 **Files:**
 - Modify: `crates/input/src/speed.rs`
 
-- [ ] **Step 1: Rewrite the system**
+- [x] **Step 1: Rewrite the system**
 
 Replace the system body (keep the `Duration` import, the `SimulationSpeed`/`TickTimer` imports, and the `tick_timer.timer.set_duration(...)` block):
 
@@ -797,7 +797,7 @@ pub fn speed_input_system(
 }
 ```
 
-- [ ] **Step 2: Replace the test module**
+- [x] **Step 2: Replace the test module**
 
 Replace the existing `#[cfg(test)] mod tests { ... }` with:
 
@@ -858,12 +858,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 Run: `cargo build -p fungai_input --tests`
 Expected: success.
 
-- [ ] **Step 4: Run speed tests**
+- [x] **Step 4: Run speed tests**
 
 Run: `cargo nextest run -p fungai_input speed`
 Expected: all three tests pass.
@@ -876,12 +876,12 @@ Verify:
 - `=` (or `Numpad+`) speeds up.
 - `-` (or `Numpad-`) slows down.
 
-- [ ] **Step 6: Lint**
+- [x] **Step 6: Lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 ```
@@ -893,12 +893,12 @@ git commit -m "input: migrate speed_input_system and tests to ActionState"
 
 ## Final verification (after all tasks)
 
-- [ ] **Step 1: Full lint**
+- [x] **Step 1: Full lint**
 
 Run: `just lint`
 Expected: clean.
 
-- [ ] **Step 2: Full test suite**
+- [x] **Step 2: Full test suite**
 
 Run: `just test`
 Expected: green across the workspace.
@@ -914,7 +914,7 @@ Verify each input behavior:
 - Digits 1–8 set the selected region's target specialization.
 - `Space` toggles pause; `=`/`Numpad+` speeds up; `-`/`Numpad-` slows down.
 
-- [ ] **Step 4: Confirm no leftover raw input reads**
+- [x] **Step 4: Confirm no leftover raw input reads**
 
 Run: `rg 'ButtonInput<KeyCode>|ButtonInput<MouseButton>|MessageReader<MouseWheel>' crates/input/src/`
 Expected: no results.
