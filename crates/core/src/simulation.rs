@@ -78,7 +78,7 @@ impl SimulationSpeed {
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SimulationSet;
+pub struct SimulationSystems;
 
 #[derive(Resource, Default, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum GamePhase {
@@ -140,8 +140,8 @@ pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(Update, SimulationSet.run_if(simulation_should_tick))
-            .add_systems(Update, tick_advancement_system.before(SimulationSet));
+        app.configure_sets(Update, SimulationSystems.run_if(simulation_should_tick))
+            .add_systems(Update, tick_advancement_system.before(SimulationSystems));
     }
 }
 

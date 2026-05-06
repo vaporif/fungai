@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::sprite_render::Material2dPlugin;
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
-use fungai_core::SimulationSet;
+use fungai_core::SimulationSystems;
 use fungai_world::terrain_generation;
 
 mod assets;
@@ -42,7 +42,7 @@ impl Plugin for RenderPlugin {
                     data_layer::extract_discovery_map.after(data_layer::extract_branch_graph),
                     data_layer::extract_rival_branch_graph,
                 )
-                    .in_set(SimulationSet),
+                    .in_set(SimulationSystems),
             )
             .add_systems(
                 Update,

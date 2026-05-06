@@ -51,6 +51,70 @@
         ])
       ];
 
+      # bevy_lint is built from TheBevyFlock/bevy_cli at the lint-v0.6.0 tag.
+      # It links rustc-private crates and therefore must be compiled with
+      # (and at runtime resolved against) the exact nightly pinned by upstream's
+      # rust-toolchain.toml (currently nightly-2026-01-22).
+      bevyLintRev = "lint-v0.6.0";
+      bevyLintNightlyDate = "2026-01-22";
+
+      bevyLintSrc = pkgs.fetchFromGitHub {
+        owner = "TheBevyFlock";
+        repo = "bevy_cli";
+        rev = bevyLintRev;
+        sha256 = "sha256-Swj7j/A7Mgd2ufSADZdGMXOLbmvpdHGJfQVFCaWX9yg=";
+      };
+
+      bevyLintNightly = pkgs.fenix.toolchainOf {
+        channel = "nightly";
+        date = bevyLintNightlyDate;
+        sha256 = "sha256-5XAIyRQMcynTWJvX5VkqErB0H4Oyg0AjeSefOyKSt7g=";
+      };
+
+      bevyLintToolchain = pkgs.fenix.combine [
+        bevyLintNightly.cargo
+        bevyLintNightly.rustc
+        bevyLintNightly.rust-src
+        bevyLintNightly.rustc-dev
+        bevyLintNightly.llvm-tools-preview
+      ];
+
+      bevyLintRustPlatform = pkgs.makeRustPlatform {
+        cargo = bevyLintToolchain;
+        rustc = bevyLintToolchain;
+      };
+
+      bevy_lint = bevyLintRustPlatform.buildRustPackage {
+        pname = "bevy_lint";
+        version = "0.6.0";
+        src = bevyLintSrc;
+        cargoLock.lockFile = "${bevyLintSrc}/Cargo.lock";
+        doCheck = false;
+        cargoBuildFlags = ["-p" "bevy_lint"];
+
+        nativeBuildInputs = [pkgs.makeBinaryWrapper];
+
+        # rustc_driver links against zlib; on darwin libiconv is also needed.
+        buildInputs =
+          [pkgs.zlib]
+          ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [pkgs.libiconv];
+
+        # bevy_lint dynamically loads librustc_driver from the nightly toolchain
+        # at runtime, and the cargo it spawns must use the matching rustc
+        # (otherwise dep crates compile under one rustc and the workspace
+        # driver under another, producing E0514 "incompatible version of rustc").
+        postInstall = ''
+          for bin in $out/bin/bevy_lint $out/bin/bevy_lint_driver; do
+            if [ -f "$bin" ]; then
+              wrapProgram "$bin" \
+                --set BEVY_LINT_SYSROOT ${bevyLintToolchain} \
+                --set RUSTC ${bevyLintToolchain}/bin/rustc \
+                --prefix PATH : ${bevyLintToolchain}/bin
+            fi
+          done
+        '';
+      };
+
       darwinDeps = with pkgs;
         pkgs.lib.optionals stdenv.hostPlatform.isDarwin [
           apple-sdk
@@ -90,6 +154,7 @@
         cargo-nextest
         cargo-watch
         lld
+        bevy_lint
       ];
 
       mkDevShell = toolchain:

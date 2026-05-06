@@ -519,11 +519,11 @@ mod tests {
 
     #[test]
     fn extract_branch_graph_does_not_run_outside_simulation_set() {
-        use fungai_core::SimulationSet;
+        use fungai_core::SimulationSystems;
 
         let mut app = test_app();
-        app.configure_sets(Update, SimulationSet.run_if(|| false));
-        app.add_systems(Update, extract_branch_graph.in_set(SimulationSet));
+        app.configure_sets(Update, SimulationSystems.run_if(|| false));
+        app.add_systems(Update, extract_branch_graph.in_set(SimulationSystems));
 
         let rid = app
             .world_mut()

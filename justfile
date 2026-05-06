@@ -18,11 +18,17 @@ build-release:
 test *args:
     cargo nextest run {{args}}
 
-# Lint code
+# Lint code (fmt + clippy + bevy_lint)
 [group('lint')]
 lint:
     cargo fmt --all -- --check
     cargo clippy --all-targets --all-features -- -D warnings
+    bevy_lint --all-targets --all-features
+
+# Run only bevy_lint
+[group('lint')]
+bevy-lint *args:
+    bevy_lint {{args}}
 
 # Format code
 [group('lint')]

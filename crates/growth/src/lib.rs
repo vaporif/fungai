@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use fungai_core::SimulationSet;
+use fungai_core::SimulationSystems;
 
 mod decay;
 mod nutrient;
@@ -26,7 +26,7 @@ impl Plugin for GrowthPlugin {
                 decay_system,
             )
                 .chain()
-                .in_set(SimulationSet),
+                .in_set(SimulationSystems),
         );
     }
 }

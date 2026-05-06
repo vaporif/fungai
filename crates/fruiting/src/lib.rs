@@ -4,7 +4,7 @@ mod spores;
 
 use bevy::prelude::*;
 
-use fungai_core::SimulationSet;
+use fungai_core::SimulationSystems;
 
 pub use effects::mufungai_effect_system;
 pub use fruiting::fruiting_system;
@@ -24,7 +24,7 @@ impl Plugin for FruitingPlugin {
                     spores::spore_system,
                 )
                     .chain()
-                    .in_set(SimulationSet),
+                    .in_set(SimulationSystems),
             );
     }
 }

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use fungai_core::SimulationSet;
+use fungai_core::SimulationSystems;
 
 mod combat;
 mod environment;
@@ -83,7 +83,7 @@ impl Plugin for AiPlugin {
                     AiSystems::Combat,
                 )
                     .chain()
-                    .in_set(SimulationSet),
+                    .in_set(SimulationSystems),
             )
             .add_plugins((
                 RivalAiPlugin,

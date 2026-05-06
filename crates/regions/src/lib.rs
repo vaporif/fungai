@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use fungai_core::SimulationSet;
+use fungai_core::SimulationSystems;
 
 mod discovery;
 mod fragment;
@@ -88,11 +88,12 @@ impl Plugin for RegionsPlugin {
                 Update,
                 (RegionsSystems::Discovery, RegionsSystems::Unlock)
                     .chain()
-                    .in_set(SimulationSet),
+                    .in_set(SimulationSystems),
             )
             .configure_sets(
                 Update,
-                (RegionsSystems::Specialization, RegionsSystems::Fragment).in_set(SimulationSet),
+                (RegionsSystems::Specialization, RegionsSystems::Fragment)
+                    .in_set(SimulationSystems),
             )
             .add_plugins((
                 SpecializationPlugin,
