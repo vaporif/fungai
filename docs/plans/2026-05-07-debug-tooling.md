@@ -130,7 +130,7 @@ If the values stay at 0.0 indefinitely, the `sysinfo_plugin` feature isn't actua
 Run: `just lint`
 Expected: no warnings.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```
 git add bin/src/debug.rs Cargo.toml
