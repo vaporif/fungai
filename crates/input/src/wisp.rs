@@ -82,7 +82,7 @@ pub fn wisp_input_system(
     // call inside `write_segment` doesn't fight the immutable iteration.
     let owned: HashSet<Hex> = tiles
         .iter()
-        .filter_map(|(gp, t)| t.region_id.map(|_| gp.0))
+        .filter_map(|(gp, t)| t.region_id.is_some().then_some(gp.0))
         .collect();
 
     let prev = std::mem::take(&mut wisp.phase);
