@@ -452,12 +452,12 @@ If you also touched `Cargo.lock`, include it.
 
 After all four tasks land:
 
-- [ ] **Step 1: Run the full workspace test suite**
+- [x] **Step 1: Run the full workspace test suite**
 
 Run: `just test`
 Expected: PASS, including the new `cli_parses_dump_schedule_flag` test.
 
-- [ ] **Step 2: Run the full lint pass**
+- [x] **Step 2: Run the full lint pass**
 
 Run: `just lint`
 Expected: no warnings.
@@ -479,7 +479,7 @@ Expected: exits quickly, `target/schedule.dot` is non-empty.
 
 Skip Step 3 if you have no graphical environment.
 
-- [ ] **Step 4: Smoke-test the trace build compiles**
+- [x] **Step 4: Smoke-test the trace build compiles**
 
 Run: `cargo build -p kingdom --features trace`
 Expected: build succeeds. Connecting to Tracy GUI is a manual step the engineer does when they actually want to profile — the build-success check is enough here.
