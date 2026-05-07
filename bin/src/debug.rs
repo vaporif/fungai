@@ -5,8 +5,11 @@ use bevy::diagnostic::{
 };
 use bevy::ecs::system::Local;
 use bevy::ecs::world::World;
+use bevy::input::ButtonInput;
 use bevy::log::info;
+use bevy::prelude::{KeyCode, Res};
 use bevy::time::Time;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 pub struct DebugPlugin;
 
@@ -16,8 +19,9 @@ impl Plugin for DebugPlugin {
             FrameTimeDiagnosticsPlugin::default(),
             EntityCountDiagnosticsPlugin::default(),
             SystemInformationDiagnosticsPlugin,
-        ))
-        .add_systems(Update, log_diagnostics);
+        ));
+        app.add_plugins(WorldInspectorPlugin::new().run_if(inspector_toggle));
+        app.add_systems(Update, log_diagnostics);
     }
 }
 
@@ -93,4 +97,12 @@ fn log_diagnostics(world: &mut World, mut last_log: Local<f32>) {
     for (label, count) in buckets.iter().take(8) {
         info!("  archetype count={count} :: {label}");
     }
+}
+
+fn inspector_toggle(keys: Res<ButtonInput<KeyCode>>, mut active: Local<bool>) -> bool {
+    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    if ctrl && keys.just_pressed(KeyCode::KeyD) {
+        *active = !*active;
+    }
+    *active
 }

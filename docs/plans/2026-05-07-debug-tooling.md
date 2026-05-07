@@ -378,18 +378,18 @@ If you also touched `Cargo.lock`, include it.
 
 Bevy's built-in `input_toggle_active` only accepts a single key, so the chord (Ctrl+D) needs a small custom run-condition that latches a `Local<bool>` on `Ctrl+D` just-pressed. The plugin only adds its UI systems when the latch is active.
 
-- [ ] **Step 1: Add dependencies to `bin/Cargo.toml`**
+- [x] **Step 1: Add dependencies to `bin/Cargo.toml`**
 
 In `bin/Cargo.toml`, extend `[dependencies]`. Pick the latest published version for each that depends on `bevy = "0.18"`:
 
 ```toml
-bevy_egui = "0.36"
-bevy-inspector-egui = "0.34"
+bevy_egui = "0.39"
+bevy-inspector-egui = "0.36"
 ```
 
 If `cargo search` shows newer or older numbers as the Bevy 0.18-compatible pair, use those instead. The two crates' versions are coupled — `bevy-inspector-egui` declares which `bevy_egui` it needs; check its Cargo.toml on crates.io.
 
-- [ ] **Step 2: Wire the inspector into `DebugPlugin` with a Ctrl+D toggle**
+- [x] **Step 2: Wire the inspector into `DebugPlugin` with a Ctrl+D toggle**
 
 In `bin/src/debug.rs`, extend the imports:
 
@@ -422,22 +422,22 @@ app.add_plugins(WorldInspectorPlugin::new().run_if(inspector_toggle));
 
 The latch starts `false` so the inspector is hidden; Ctrl+D flips it on, Ctrl+D again flips it off.
 
-- [ ] **Step 3: Build to confirm the deps resolve**
+- [x] **Step 3: Build to confirm the deps resolve**
 
 Run: `cargo check -p kingdom`
 Expected: clean build. If it errors with a `bevy_egui` or `bevy_winit` version conflict, the published version of `bevy-inspector-egui` you pinned doesn't match the workspace's Bevy version — pick a different one.
 
-- [ ] **Step 4: Smoke-test the toggle in dev**
+- [x] **Step 4: Smoke-test the toggle in dev**
 
 Run: `just dev`
 Expected: game launches normally, no inspector visible. Press Ctrl+D once → inspector window appears with the entity tree. Press Ctrl+D again → window disappears. If you have no graphical environment (CI, headless), skip this step and note in your report.
 
-- [ ] **Step 5: Run the lint pass**
+- [x] **Step 5: Run the lint pass**
 
 Run: `just lint`
 Expected: no warnings.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```
 git add bin/Cargo.toml bin/src/debug.rs
