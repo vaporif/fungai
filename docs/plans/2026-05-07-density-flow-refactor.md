@@ -2616,7 +2616,7 @@ Expected: game launches. Click-and-drag from somewhere on the mycelium outward â
 just lint
 ```
 
-- [ ] **Step 12: Commit T5**
+- [x] **Step 12: Commit T5**
 
 ```bash
 git add -A
