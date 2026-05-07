@@ -1,11 +1,10 @@
 use bevy::prelude::*;
-use kingdom_core::{BIAS_DECAY, Tile};
+use kingdom_core::{BIAS_DECAY, BIOMASS_SNAP_EPSILON, Tile};
 
 pub fn bias_decay_system(mut tiles: Query<&mut Tile>) {
-    const EPSILON: f32 = 0.001;
     for mut tile in tiles.iter_mut() {
         tile.priority_bias *= BIAS_DECAY;
-        if tile.priority_bias.length_squared() < EPSILON * EPSILON {
+        if tile.priority_bias.length_squared() < BIOMASS_SNAP_EPSILON * BIOMASS_SNAP_EPSILON {
             tile.priority_bias = Vec2::ZERO;
         }
     }

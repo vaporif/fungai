@@ -48,6 +48,13 @@ pub struct Tile {
     pub contents: Option<TileContents>,
 }
 
+impl Tile {
+    /// True when the tile is claimed by a region with biomass at or above the claim threshold.
+    pub fn is_owned(&self) -> bool {
+        self.region_id.is_some() && self.biomass >= crate::CLAIM_THRESHOLD
+    }
+}
+
 impl Default for Tile {
     fn default() -> Self {
         Self {

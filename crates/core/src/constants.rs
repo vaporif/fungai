@@ -22,6 +22,8 @@ pub const BIAS_STROKE_INTENSITY: f32 = 0.5;
 pub const BIAS_MAGNITUDE_CAP: f32 = 1.5;
 pub const DIEBACK_THRESHOLD: f32 = 0.05;
 pub const DIEBACK_RATE: f32 = 0.95;
+// small enough that snap-to-zero hides float drift, large enough to actually fire
+pub const BIOMASS_SNAP_EPSILON: f32 = 0.001;
 
 // Resource yields (T4).
 pub const DECOMP_RATE: f32 = 0.02;

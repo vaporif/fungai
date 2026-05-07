@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use kingdom_core::*;
+use kingdom_core::{GridPos, GridWorld, Hex, HexLayout, Tile};
 
 pub fn nutrient_gradient_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
@@ -39,6 +39,7 @@ pub fn nutrient_gradient_system(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kingdom_core::{RegionStates, create_hex_layout};
 
     fn test_app() -> App {
         let mut app = App::new();

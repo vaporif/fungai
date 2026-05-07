@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use hexx::Hex;
-use kingdom_core::{CLAIM_THRESHOLD, GridPos, GridWorld, RegionId, RegionStates, Tile};
+use kingdom_core::{GridPos, GridWorld, RegionId, RegionStates, Tile};
 
 pub fn region_tracking_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
@@ -14,11 +14,8 @@ pub fn region_tracking_system(
     // flow that hasn't accumulated yet) do not contribute to region tracking.
     let player_tiles: HashMap<Hex, RegionId> = tiles
         .iter()
-        .filter_map(|(gpos, tile)| {
-            tile.region_id
-                .filter(|_| tile.biomass >= CLAIM_THRESHOLD)
-                .map(|rid| (gpos.0, rid))
-        })
+        .filter(|(_, tile)| tile.is_owned())
+        .filter_map(|(gpos, tile)| tile.region_id.map(|rid| (gpos.0, rid)))
         .collect();
 
     for state in region_states.regions.values_mut() {

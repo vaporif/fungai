@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 use kingdom_core::{GridPos, GridWorld, TerrainType, Tile};
 
 const DIFFUSION_RATE: f32 = 0.05;
 
 pub fn moisture_diffusion_system(mut tiles: Query<(&GridPos, &mut Tile)>, grid: Res<GridWorld>) {
-    let snapshot: std::collections::HashMap<_, _> =
-        tiles.iter().map(|(gp, t)| (gp.0, t.moisture)).collect();
+    let snapshot: HashMap<_, _> = tiles.iter().map(|(gp, t)| (gp.0, t.moisture)).collect();
 
     for (gpos, mut tile) in tiles.iter_mut() {
         if tile.terrain == TerrainType::Water {

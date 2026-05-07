@@ -11,6 +11,8 @@ use rand::SeedableRng;
 use rand::prelude::*;
 use rand::rngs::StdRng;
 
+const _: () = assert!(WATER_GROWTH_COST > 0.0);
+
 #[derive(Resource)]
 pub struct DensityFlowRng(pub StdRng);
 
@@ -23,7 +25,7 @@ impl Default for DensityFlowRng {
 #[derive(Default)]
 struct TileDelta {
     biomass_in: f32,
-    contributing_region: Option<(RegionId, f32)>,
+    region_shares: HashMap<RegionId, f32>,
 }
 
 #[derive(Clone, Copy)]
@@ -111,7 +113,7 @@ pub fn density_flow_system(
             continue;
         }
 
-        let max_outflow = (snap.biomass * 0.1).min(snap.moisture / WATER_GROWTH_COST.max(1e-6));
+        let max_outflow = (snap.biomass * 0.1).min(snap.moisture / WATER_GROWTH_COST);
         if max_outflow <= 0.0 {
             continue;
         }
@@ -120,10 +122,7 @@ pub fn density_flow_system(
             let share = max_outflow * (weight / total);
             let entry = deltas.entry(npos).or_default();
             entry.biomass_in += share;
-            match &mut entry.contributing_region {
-                Some((_existing_rid, existing_share)) if *existing_share >= share => {}
-                slot => *slot = Some((rid, share)),
-            }
+            *entry.region_shares.entry(rid).or_insert(0.0) += share;
             *outflow_total.entry(pos).or_insert(0.0) += share;
             *water_consumption.entry(pos).or_insert(0.0) += share * WATER_GROWTH_COST;
         }
@@ -142,7 +141,10 @@ pub fn density_flow_system(
             tile.biomass = new_biomass;
             if was_unowned
                 && new_biomass >= CLAIM_THRESHOLD
-                && let Some((rid, _)) = delta.contributing_region
+                && let Some((&rid, _)) = delta
+                    .region_shares
+                    .iter()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             {
                 tile.region_id = Some(rid);
                 if !tile.discovered {
@@ -303,18 +305,17 @@ mod tests {
         );
 
         // Run multiple ticks — single-tick flow may not cross threshold.
-        for _ in 0..10 {
+        for _ in 0..20 {
             app.update();
         }
 
         let tile = app.world().get::<Tile>(target_e).unwrap();
         assert!(
-            tile.region_id == Some(rid) || tile.biomass < CLAIM_THRESHOLD,
-            "claimed tiles should belong to the source region"
+            tile.biomass >= CLAIM_THRESHOLD,
+            "expected target tile to cross claim threshold within 20 ticks; biomass = {}",
+            tile.biomass
         );
-        if tile.biomass >= CLAIM_THRESHOLD {
-            assert_eq!(tile.region_id, Some(rid));
-        }
+        assert_eq!(tile.region_id, Some(rid));
     }
 
     #[test]

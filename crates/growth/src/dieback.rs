@@ -1,7 +1,5 @@
 use bevy::prelude::*;
-use kingdom_core::{CLAIM_THRESHOLD, DIEBACK_RATE, DIEBACK_THRESHOLD, Tile};
-
-const EPSILON: f32 = 0.001;
+use kingdom_core::{BIOMASS_SNAP_EPSILON, CLAIM_THRESHOLD, DIEBACK_RATE, DIEBACK_THRESHOLD, Tile};
 
 pub fn dieback_system(mut tiles: Query<&mut Tile>) {
     for mut tile in tiles.iter_mut() {
@@ -14,7 +12,7 @@ pub fn dieback_system(mut tiles: Query<&mut Tile>) {
         if tile.biomass < CLAIM_THRESHOLD {
             tile.region_id = None;
         }
-        if tile.biomass < EPSILON {
+        if tile.biomass < BIOMASS_SNAP_EPSILON {
             tile.biomass = 0.0;
         }
     }
@@ -90,5 +88,35 @@ mod tests {
             .id();
         app.update();
         assert_eq!(app.world().get::<Tile>(e).unwrap().biomass, 0.0);
+    }
+
+    #[test]
+    fn dry_tile_decays_then_loses_claim() {
+        let mut app = test_app();
+        let e = app
+            .world_mut()
+            .spawn((
+                GridPos(Hex::ZERO),
+                Tile {
+                    region_id: Some(RegionId(0)),
+                    biomass: 0.5,
+                    moisture: 0.0,
+                    ..default()
+                },
+            ))
+            .id();
+        // First tick: biomass shrinks but stays above CLAIM_THRESHOLD.
+        app.update();
+        let tile = app.world().get::<Tile>(e).unwrap();
+        assert!(tile.biomass < 0.5);
+        assert!(tile.biomass >= CLAIM_THRESHOLD);
+        assert_eq!(tile.region_id, Some(RegionId(0)));
+        // Run more ticks until biomass drops below threshold.
+        for _ in 0..40 {
+            app.update();
+        }
+        let tile = app.world().get::<Tile>(e).unwrap();
+        assert!(tile.biomass < CLAIM_THRESHOLD);
+        assert_eq!(tile.region_id, None);
     }
 }

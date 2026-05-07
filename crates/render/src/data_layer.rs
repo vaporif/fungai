@@ -2,9 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use hexx::Hex;
-use kingdom_core::{
-    CLAIM_THRESHOLD, GridPos, GridWorld, HexLayout, RegionId, SelectedRegion, Tile,
-};
+use kingdom_core::{GridPos, GridWorld, HexLayout, RegionId, SelectedRegion, Tile};
 
 #[derive(Resource, Default, Debug)]
 pub struct BranchGraph {
@@ -60,8 +58,8 @@ pub fn extract_branch_graph(
     // actually accumulated past CLAIM_THRESHOLD. Sub-threshold flow that hasn't
     // claimed yet is part of the simulation but not the visible network.
     for (gpos, tile) in tiles.iter() {
-        if let Some(rid) = tile.region_id
-            && tile.biomass >= CLAIM_THRESHOLD
+        if tile.is_owned()
+            && let Some(rid) = tile.region_id
         {
             graph.nodes.insert(
                 gpos.0,
