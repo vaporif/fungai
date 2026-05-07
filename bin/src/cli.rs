@@ -34,4 +34,10 @@ mod tests {
             Some(std::path::PathBuf::from("schedule.dot"))
         );
     }
+
+    #[test]
+    fn cli_no_dump_schedule_flag_yields_none() {
+        let args = Args::try_parse_from(["kingdom"]).unwrap();
+        assert_eq!(args.dump_schedule, None);
+    }
 }
