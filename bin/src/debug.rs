@@ -19,7 +19,7 @@ impl Plugin for DebugPlugin {
     }
 }
 
-fn log_diagnostics(world: &mut World, mut last_log: Local<f32>) {
+fn log_diagnostics(world: &World, mut last_log: Local<f32>) {
     let now = world.resource::<Time>().elapsed_secs();
     if now - *last_log < 2.0 {
         return;
