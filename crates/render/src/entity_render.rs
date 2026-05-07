@@ -3,12 +3,12 @@ use std::collections::HashSet;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use kingdom_core::{
-    FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout, MushroomEntity,
-    NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent,
+    BIAS_MAGNITUDE_CAP, FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout,
+    MushroomEntity, NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent, Tile,
 };
 
 use crate::assets::EntitySprites;
-use crate::data_layer::{PriorityBiasMap, SelectedRegionTiles};
+use crate::data_layer::SelectedRegionTiles;
 
 #[derive(Component)]
 pub struct OrganismSprite;
@@ -165,39 +165,39 @@ pub fn despawn_orphaned_organism_sprites(
 }
 
 #[derive(Component)]
-pub struct PriorityArrowSprite;
+pub struct BiasGlowMarker;
 
-pub fn priority_arrow_render_system(
+// Despawn-and-respawn each frame is the simplest correct implementation. On
+// an 80x60 grid only owned + recently-painted tiles fire the glow path
+// (typically <100 entities), so the archetype churn is fine. Switch to a
+// diff-based update if profiling ever shows hitching here.
+pub fn bias_glow_render_system(
     mut commands: Commands,
-    bias_map: Res<PriorityBiasMap>,
-    existing: Query<Entity, With<PriorityArrowSprite>>,
     layout: Res<HexLayout>,
+    tiles: Query<(&GridPos, &Tile)>,
+    existing: Query<Entity, With<BiasGlowMarker>>,
 ) {
-    if !bias_map.is_changed() {
-        return;
-    }
-
     for entity in existing.iter() {
         commands.entity(entity).despawn();
     }
 
-    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
-    let arrow_size = Vec2::new(inner_radius * 0.5, inner_radius * 0.15);
+    let quad_size = Vec2::splat(layout.scale.x * 1.6);
 
-    for (hex, bias) in &bias_map.biases {
-        let angle = bias.y.atan2(bias.x);
-        let base_pos = layout.hex_to_world_pos(*hex);
-        let offset = *bias * inner_radius * 0.3;
-        let world_pos = Vec3::new(base_pos.x + offset.x, base_pos.y + offset.y, 3.0);
-
+    for (gpos, tile) in tiles.iter() {
+        let mag = tile.priority_bias.length();
+        if mag < 0.05 {
+            continue;
+        }
+        let alpha = (mag / BIAS_MAGNITUDE_CAP).min(1.0);
+        let world = layout.hex_to_world_pos(gpos.0);
         commands.spawn((
-            PriorityArrowSprite,
+            BiasGlowMarker,
             Sprite {
-                color: Color::srgba(0.2, 1.0, 0.6, 0.6),
-                custom_size: Some(arrow_size),
+                color: Color::srgba(1.0, 0.7, 0.3, alpha),
+                custom_size: Some(quad_size),
                 ..default()
             },
-            Transform::from_translation(world_pos).with_rotation(Quat::from_rotation_z(angle)),
+            Transform::from_xyz(world.x, world.y, 5.0),
         ));
     }
 }

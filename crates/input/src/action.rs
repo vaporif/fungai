@@ -9,9 +9,7 @@ pub enum Action {
     Zoom,
 
     SelectTile,
-
-    SetPriority,
-    ClearPriority,
+    Paint,
 
     TogglePause,
     SpeedUp,
@@ -26,15 +24,11 @@ pub fn default_input_map() -> InputMap<Action> {
 
     map.insert_axis(Action::Zoom, MouseScrollAxis::Y);
 
+    // SelectTile and Paint share the left mouse button. The wisp state machine
+    // disambiguates tap-vs-drag after the fact and emits TileTapped for taps;
+    // selection_system reads that message rather than just_pressed(SelectTile).
     map.insert(Action::SelectTile, MouseButton::Left);
-
-    // PrioritizeLongest (the leafwing default) suppresses SetPriority whenever
-    // the Shift+P chord matches, so plain P never fires as a clear.
-    map.insert(Action::SetPriority, KeyCode::KeyP);
-    map.insert(
-        Action::ClearPriority,
-        ButtonlikeChord::modified(ModifierKey::Shift, KeyCode::KeyP),
-    );
+    map.insert(Action::Paint, MouseButton::Left);
 
     map.insert(Action::TogglePause, KeyCode::Space);
     map.insert(Action::SpeedUp, KeyCode::Equal);
