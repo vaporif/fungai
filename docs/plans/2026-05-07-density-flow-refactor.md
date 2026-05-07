@@ -3037,7 +3037,7 @@ cargo nextest run -p kingdom_regions --test decompose_to_fragment
 
 Expected: pass.
 
-- [x] **Step 6: Verify fruiting still progresses**
+- [ ] **Step 6: Verify fruiting still progresses** (skipped — requires graphical environment)
 
 Manual verification:
 
@@ -3058,7 +3058,7 @@ just test
 
 Expected: both pass clean.
 
-- [x] **Step 8: Final smoke test**
+- [ ] **Step 8: Final smoke test** (skipped — requires graphical environment)
 
 ```bash
 just dev
