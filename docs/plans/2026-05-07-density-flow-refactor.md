@@ -452,7 +452,7 @@ just lint
 
 Expected: pass. Fix any warnings introduced by dead-code removal (unused imports etc).
 
-- [ ] **Step 25: Commit T1**
+- [x] **Step 25: Commit T1**
 
 ```bash
 git add -A
