@@ -176,15 +176,18 @@ pub fn bias_glow_render_system(
     layout: Res<HexLayout>,
     changed_tiles: Query<(Entity, &GridPos, &Tile), Changed<Tile>>,
     existing: Query<(Entity, &BiasGlowMarker)>,
+    mut existing_by_source: Local<HashMap<Entity, Entity>>,
 ) {
     if changed_tiles.is_empty() {
         return;
     }
 
-    let existing_by_source: HashMap<Entity, Entity> = existing
-        .iter()
-        .map(|(glow_e, marker)| (marker.source, glow_e))
-        .collect();
+    existing_by_source.clear();
+    existing_by_source.extend(
+        existing
+            .iter()
+            .map(|(glow_e, marker)| (marker.source, glow_e)),
+    );
 
     let quad_size = Vec2::splat(layout.scale.x * 1.6);
 
