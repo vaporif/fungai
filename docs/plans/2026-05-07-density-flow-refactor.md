@@ -2729,13 +2729,13 @@ git commit -m "T6: HUD shows sugars/melanin; tile popover shows new tile fields"
 - Create: `crates/growth/tests/integration.rs` (or per-system in respective crate `tests/` dirs)
 - Modify: any tests in `crates/fruiting/src/*` whose construction patterns broke under T2 / T3
 
-- [ ] **Step 1: Verify baseline (T3, T4, T5, T6 complete)**
+- [x] **Step 1: Verify baseline (T3, T4, T5, T6 complete)**
 
 ```bash
 just lint && just test && git status
 ```
 
-- [ ] **Step 2: Add integration test `paint_then_grow`**
+- [x] **Step 2: Add integration test `paint_then_grow`**
 
 Create `crates/growth/tests/paint_then_grow.rs`:
 
@@ -2827,7 +2827,7 @@ cargo nextest run -p kingdom_growth --test paint_then_grow
 
 Expected: pass.
 
-- [ ] **Step 3: Add integration test `dry_zone_dieback`**
+- [x] **Step 3: Add integration test `dry_zone_dieback`**
 
 Create `crates/growth/tests/dry_zone_dieback.rs`:
 
@@ -2901,7 +2901,7 @@ cargo nextest run -p kingdom_growth --test dry_zone_dieback
 
 Expected: pass.
 
-- [ ] **Step 4: Add integration test `slot_machine_triggers_on_unique_decomp`**
+- [x] **Step 4: Add integration test `slot_machine_triggers_on_unique_decomp`**
 
 Create `crates/regions/tests/slot_machine_unique_decomp.rs`:
 
@@ -2977,7 +2977,7 @@ cargo nextest run -p kingdom_regions --test slot_machine_unique_decomp
 
 Expected: pass.
 
-- [ ] **Step 5: Add integration test `decompose_to_fragment_fusion`**
+- [x] **Step 5: Add integration test `decompose_to_fragment_fusion`**
 
 Create `crates/regions/tests/decompose_to_fragment.rs`. The test sets up a tile with a `Fragment(_)` content and adjacent owned mycelium with biomass > CLAIM_THRESHOLD; runs ticks; asserts `GameState.fragments_fused` increments. The fragment_system code (existing in `crates/regions/src/fragment.rs`) was migrated in T2 — verify the test is consistent with whatever ownership semantics fragment_system now uses.
 
@@ -3037,7 +3037,7 @@ cargo nextest run -p kingdom_regions --test decompose_to_fragment
 
 Expected: pass.
 
-- [ ] **Step 6: Verify fruiting still progresses**
+- [x] **Step 6: Verify fruiting still progresses**
 
 Manual verification:
 
@@ -3049,7 +3049,7 @@ Inside the running game: paint a stroke toward a fragment-bearing tile, wait unt
 
 If `crates/fruiting/src/fruiting.rs` recipe checks `region.total_biomass` correctly, a fruit body should grow within ~1 minute of stable territory. If it doesn't, read fruiting.rs and check whether T2's RegionState rename was properly applied.
 
-- [ ] **Step 7: Run full lints and tests**
+- [x] **Step 7: Run full lints and tests**
 
 ```bash
 just lint
@@ -3058,7 +3058,7 @@ just test
 
 Expected: both pass clean.
 
-- [ ] **Step 8: Final smoke test**
+- [x] **Step 8: Final smoke test**
 
 ```bash
 just dev
@@ -3066,7 +3066,7 @@ just dev
 
 Click-paint outward from spawn, watch density spread, observe fragments fuse and fruit bodies appear, check HUD resource counters update.
 
-- [ ] **Step 9: Commit T7**
+- [x] **Step 9: Commit T7**
 
 ```bash
 git add -A
