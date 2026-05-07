@@ -3,6 +3,7 @@ use bevy::diagnostic::{
     SystemInformationDiagnosticsPlugin,
 };
 use bevy::prelude::*;
+use bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 pub struct DebugPlugin;
@@ -14,6 +15,7 @@ impl Plugin for DebugPlugin {
             EntityCountDiagnosticsPlugin::default(),
             SystemInformationDiagnosticsPlugin,
         ));
+        app.add_plugins(EguiPlugin::default());
         app.add_plugins(WorldInspectorPlugin::new().run_if(inspector_toggle));
         app.add_systems(Update, log_diagnostics);
     }
