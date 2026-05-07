@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use clap::Parser;
-use kingdom_core::{default_seed, LaunchConfig};
+use kingdom_core::{LaunchConfig, default_seed};
 
 mod cli;
 mod debug;
