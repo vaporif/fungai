@@ -24,8 +24,6 @@ pub fn fragment_system(
             continue;
         };
 
-        // THRESHOLD-GATED: fragment only fuses when the player network has
-        // actually arrived at the tile, not just tagged it.
         if tile.region_id.is_some() && tile.biomass >= CLAIM_THRESHOLD {
             fragment.fused = true;
             game_state.fragments_fused += 1;

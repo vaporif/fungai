@@ -10,9 +10,6 @@ pub fn selection_system(
     tiles: Query<&Tile>,
     mut selected: ResMut<SelectedRegion>,
 ) {
-    // The wisp emits one TileTapped per confirmed tap (short press without
-    // drag). If multiple arrive in a frame, the last one wins — clicks chain
-    // about as well as anything else.
     let Some(tap) = taps.read().last() else {
         return;
     };

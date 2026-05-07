@@ -15,6 +15,9 @@ pub const BIASED_FLOW_WEIGHT: f32 = 0.6;
 pub const GRADIENT_FLOW_WEIGHT: f32 = 0.1;
 pub const FLOW_NOISE: f32 = 0.15;
 pub const WATER_GROWTH_COST: f32 = 0.05;
+pub const MAX_OUTFLOW_FRACTION: f32 = 0.1;
+pub const MOISTURE_DIFFUSION_RATE: f32 = 0.05;
+const _: () = assert!(WATER_GROWTH_COST > 0.0);
 
 // Bias painting and dieback.
 pub const BIAS_DECAY: f32 = 0.95;
@@ -40,4 +43,6 @@ pub const TAP_TIME_MS: u32 = 150;
 pub const SAMPLE_INTERVAL_MS: u32 = 50;
 pub const SAMPLE_HEX_DISTANCE: f32 = 0.5;
 pub const WISP_SENSE_RADIUS_HEX: i32 = 5;
+
+// Render thresholds.
 pub const BIAS_GLOW_VISIBLE_THRESHOLD: f32 = 0.05;

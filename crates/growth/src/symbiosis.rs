@@ -24,7 +24,6 @@ pub fn symbiosis_system(
         }
         let Some(rid) = tile.region_id else { continue };
 
-        // One trade per source tile per tick — keeps moisture cost bounded.
         for (npos, nentity) in grid.neighbors(gpos.0) {
             let Some(&n_contents) = snapshot.get(&npos) else {
                 continue;
@@ -32,9 +31,11 @@ pub fn symbiosis_system(
             if !matches!(n_contents, Some(TileContents::PlantRoot(_))) {
                 continue;
             }
-            if let Ok(mut plant) = plants.get_mut(nentity) {
-                plant.trade_active = true;
-            }
+            // Skip if the plant agent was despawned but TileContents wasn't cleared yet.
+            let Ok(mut plant) = plants.get_mut(nentity) else {
+                continue;
+            };
+            plant.trade_active = true;
             if let Some(state) = region_states.get_mut(rid) {
                 state.sugars += SUGAR_FROM_SYMBIOSIS;
             }

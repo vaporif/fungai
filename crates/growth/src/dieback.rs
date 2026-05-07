@@ -105,13 +105,11 @@ mod tests {
                 },
             ))
             .id();
-        // First tick: biomass shrinks but stays above CLAIM_THRESHOLD.
         app.update();
         let tile = app.world().get::<Tile>(e).unwrap();
         assert!(tile.biomass < 0.5);
         assert!(tile.biomass >= CLAIM_THRESHOLD);
         assert_eq!(tile.region_id, Some(RegionId(0)));
-        // Run more ticks until biomass drops below threshold.
         for _ in 0..40 {
             app.update();
         }

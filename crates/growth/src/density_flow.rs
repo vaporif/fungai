@@ -4,14 +4,12 @@ use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
 use kingdom_core::{
     AUTONOMOUS_FLOW_WEIGHT, BIASED_FLOW_WEIGHT, BIOMASS_CAP, CLAIM_THRESHOLD, FLOW_NOISE,
-    GRADIENT_FLOW_WEIGHT, GridPos, GridWorld, Hex, HexLayout, MIN_FLOW_DENSITY, RegionId, Tile,
-    TileDiscovered, WATER_GROWTH_COST,
+    GRADIENT_FLOW_WEIGHT, GridPos, GridWorld, Hex, HexLayout, MAX_OUTFLOW_FRACTION,
+    MIN_FLOW_DENSITY, RegionId, Tile, TileDiscovered, WATER_GROWTH_COST,
 };
 use rand::SeedableRng;
 use rand::prelude::*;
 use rand::rngs::StdRng;
-
-const _: () = assert!(WATER_GROWTH_COST > 0.0);
 
 #[derive(Resource)]
 pub struct DensityFlowRng(pub StdRng);
@@ -25,6 +23,8 @@ impl Default for DensityFlowRng {
 #[derive(Default)]
 struct TileDelta {
     biomass_in: f32,
+    biomass_out: f32,
+    water_used: f32,
     region_shares: HashMap<RegionId, f32>,
 }
 
@@ -45,7 +45,6 @@ pub fn density_flow_system(
     mut rng: ResMut<DensityFlowRng>,
     mut discovered: MessageWriter<TileDiscovered>,
 ) {
-    // Phase 1: snapshot + compute outflows.
     let snapshot: HashMap<Hex, FlowSnapshot> = tiles
         .iter()
         .map(|(gp, t)| {
@@ -64,12 +63,8 @@ pub fn density_flow_system(
         .collect();
 
     let mut deltas: HashMap<Hex, TileDelta> = HashMap::new();
-    let mut outflow_total: HashMap<Hex, f32> = HashMap::new();
-    let mut water_consumption: HashMap<Hex, f32> = HashMap::new();
 
-    // Iterate in sorted-key order so HashMap iteration nondeterminism does not
-    // interleave with rng.random() calls. Without this, two runs with the same
-    // DensityFlowRng seed produce different outputs, breaking test reproducibility.
+    // Sort so rng draws are deterministic across runs with the same seed.
     let mut keys: Vec<Hex> = snapshot.keys().copied().collect();
     keys.sort_unstable_by_key(|h| (h.x, h.y));
 
@@ -108,12 +103,13 @@ pub fn density_flow_system(
             }
         }
 
-        let total: f32 = candidates.iter().map(|(_, w)| *w).sum();
+        let total: f32 = candidates.iter().map(|&(_, w)| w).sum();
         if total <= 0.0 {
             continue;
         }
 
-        let max_outflow = (snap.biomass * 0.1).min(snap.moisture / WATER_GROWTH_COST);
+        let max_outflow =
+            (snap.biomass * MAX_OUTFLOW_FRACTION).min(snap.moisture / WATER_GROWTH_COST);
         if max_outflow <= 0.0 {
             continue;
         }
@@ -123,19 +119,20 @@ pub fn density_flow_system(
             let entry = deltas.entry(npos).or_default();
             entry.biomass_in += share;
             *entry.region_shares.entry(rid).or_insert(0.0) += share;
-            *outflow_total.entry(pos).or_insert(0.0) += share;
-            *water_consumption.entry(pos).or_insert(0.0) += share * WATER_GROWTH_COST;
+            let source = deltas.entry(pos).or_default();
+            source.biomass_out += share;
+            source.water_used += share * WATER_GROWTH_COST;
         }
     }
 
-    // Phase 2: apply. Per the design spec ("don't drain more than ten percent per
-    // tick"), source biomass is deducted by the total outflow it sent; neighbors
-    // gain biomass; both source and sink converge subject to BIOMASS_CAP.
     for (gpos, mut tile) in tiles.iter_mut() {
-        if let Some(&out) = outflow_total.get(&gpos.0) {
-            tile.biomass = (tile.biomass - out).max(0.0);
+        let Some(delta) = deltas.get(&gpos.0) else {
+            continue;
+        };
+        if delta.biomass_out > 0.0 {
+            tile.biomass = (tile.biomass - delta.biomass_out).max(0.0);
         }
-        if let Some(delta) = deltas.get(&gpos.0) {
+        if delta.biomass_in > 0.0 {
             let new_biomass = (tile.biomass + delta.biomass_in).min(BIOMASS_CAP);
             let was_unowned = tile.region_id.is_none();
             tile.biomass = new_biomass;
@@ -145,8 +142,6 @@ pub fn density_flow_system(
                     delta.region_shares.iter().max_by(|(rid_a, a), (rid_b, b)| {
                         a.partial_cmp(b)
                             .unwrap_or(std::cmp::Ordering::Equal)
-                            // Deterministic tiebreaker: smaller RegionId wins. HashMap
-                            // iteration order is otherwise nondeterministic on ties.
                             .then_with(|| rid_b.0.cmp(&rid_a.0))
                     })
             {
@@ -160,8 +155,8 @@ pub fn density_flow_system(
                 }
             }
         }
-        if let Some(&used) = water_consumption.get(&gpos.0) {
-            tile.moisture = (tile.moisture - used).max(0.0);
+        if delta.water_used > 0.0 {
+            tile.moisture = (tile.moisture - delta.water_used).max(0.0);
         }
     }
 }

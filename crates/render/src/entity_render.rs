@@ -14,14 +14,12 @@ use crate::data_layer::SelectedRegionTiles;
 #[derive(Component)]
 pub struct OrganismSprite;
 
-/// Sprite size based on hex inner radius (apothem) at ~70% fill.
 #[must_use]
 pub fn organism_sprite_size(layout: &HexLayout) -> Vec2 {
     let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
     Vec2::splat(inner_radius * 1.4)
 }
 
-// One `Added<T>` query per organism so each component picks its own sprite/colour.
 #[derive(SystemParam)]
 pub struct NewOrganisms<'w, 's> {
     fragments: Query<'w, 's, (Entity, &'static GridPos), Added<FragmentAgent>>,
@@ -134,7 +132,6 @@ pub fn spawn_organism_sprites(
     }
 }
 
-// One `RemovedComponents<T>` per organism — they can't be merged into one param.
 #[derive(SystemParam)]
 pub struct RemovedOrganisms<'w, 's> {
     fragments: RemovedComponents<'w, 's, FragmentAgent>,
@@ -171,10 +168,6 @@ pub fn despawn_orphaned_organism_sprites(
 #[derive(Component)]
 pub struct BiasGlowMarker;
 
-// Despawn-and-respawn each frame is the simplest correct implementation. On
-// an 80x60 grid only owned + recently-painted tiles fire the glow path
-// (typically <100 entities), so the archetype churn is fine. Switch to a
-// diff-based update if profiling ever shows hitching here.
 pub fn bias_glow_render_system(
     mut commands: Commands,
     layout: Res<HexLayout>,
@@ -194,9 +187,6 @@ pub fn bias_glow_render_system(
         }
         let alpha = (mag / BIAS_MAGNITUDE_CAP).min(1.0);
         let world = layout.hex_to_world_pos(gpos.0);
-        // z=0.7 sits above the region highlight (z=0.5) but below the network
-        // (z=1.0) and organism sprites (z=2.0), so the glow hints at painted
-        // direction without occluding fauna or mushrooms.
         commands.spawn((
             BiasGlowMarker,
             Sprite {
@@ -212,7 +202,6 @@ pub fn bias_glow_render_system(
 #[derive(Component)]
 pub struct RegionHighlightSprite;
 
-/// Build a triangle-list mesh of thin quads for the boundary edges of a hex region.
 fn build_outline_mesh(tiles: &[Hex], layout: &HexLayout, half_width: f32) -> Option<Mesh> {
     let tile_set: HashSet<Hex> = tiles.iter().copied().collect();
     let mut positions: Vec<[f32; 3]> = Vec::new();

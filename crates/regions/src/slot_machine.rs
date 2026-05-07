@@ -7,7 +7,6 @@ use rand::seq::IndexedRandom;
 
 #[derive(Message)]
 pub struct SlotMachineTriggered {
-    pub pool: UnlockPool,
     pub options: Vec<UnlockOption>,
 }
 
@@ -29,14 +28,9 @@ pub fn slot_machine_system(
         if !event.was_unique {
             continue;
         }
-        // All decomp triggers currently funnel into the Decomposition pool. Future tiers
-        // can branch by reading the tile terrain at event.pos.
         let pool_options = unlock_pool_options(UnlockPool::Decomposition);
         let selected: Vec<UnlockOption> = pool_options.sample(&mut rng.0, 3).cloned().collect();
-        slot_messages.write(SlotMachineTriggered {
-            pool: UnlockPool::Decomposition,
-            options: selected,
-        });
+        slot_messages.write(SlotMachineTriggered { options: selected });
     }
 }
 

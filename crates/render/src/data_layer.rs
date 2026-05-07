@@ -31,8 +31,7 @@ pub struct RegionHulls {
 
 #[derive(Resource, Default, Debug)]
 pub struct DiscoveryMap {
-    /// Maps tile position to discovery level (0.0 = fully hidden, 1.0 = fully revealed).
-    /// Tiles near the network get higher values; tiles far away get lower values.
+    /// 0.0 fully hidden, 1.0 fully revealed.
     pub discovered: HashMap<Hex, f32>,
 }
 
@@ -45,18 +44,15 @@ pub fn extract_branch_graph(
     tiles: Query<(&GridPos, &Tile)>,
     grid: Res<GridWorld>,
     mut graph: ResMut<BranchGraph>,
+    mut node_keys: Local<Vec<Hex>>,
+    mut seen_edges: Local<HashSet<(Hex, Hex)>>,
 ) {
-    graph.nodes.clear();
-    graph.edges.clear();
-
-    // THRESHOLD-GATED: only render network nodes for tiles whose biomass has
-    // actually accumulated past CLAIM_THRESHOLD. Sub-threshold flow that hasn't
-    // claimed yet is part of the simulation but not the visible network.
+    let mut new_nodes: HashMap<Hex, BranchNode> = HashMap::with_capacity(graph.nodes.len());
     for (gpos, tile) in tiles.iter() {
         if tile.is_owned()
             && let Some(rid) = tile.region_id
         {
-            graph.nodes.insert(
+            new_nodes.insert(
                 gpos.0,
                 BranchNode {
                     pos: gpos.0,
@@ -67,20 +63,24 @@ pub fn extract_branch_graph(
         }
     }
 
-    let mut seen_edges: HashSet<(Hex, Hex)> = HashSet::default();
-    let node_keys: Vec<Hex> = graph.nodes.keys().copied().collect();
-    for pos in node_keys {
+    node_keys.clear();
+    node_keys.extend(new_nodes.keys().copied());
+    node_keys.sort_unstable_by_key(|h| (h.x, h.y));
+
+    seen_edges.clear();
+    let mut new_edges: Vec<BranchEdge> = Vec::with_capacity(graph.edges.len());
+    for &pos in node_keys.iter() {
         for (npos, _) in grid.neighbors(pos) {
-            if graph.nodes.contains_key(&npos) {
-                let edge_key = if pos.x < npos.x || (pos.x == npos.x && pos.y < npos.y) {
+            if new_nodes.contains_key(&npos) {
+                let edge_key = if (pos.x, pos.y) < (npos.x, npos.y) {
                     (pos, npos)
                 } else {
                     (npos, pos)
                 };
                 if seen_edges.insert(edge_key) {
-                    let from_biomass = graph.nodes[&pos].biomass;
-                    let to_biomass = graph.nodes[&npos].biomass;
-                    graph.edges.push(BranchEdge {
+                    let from_biomass = new_nodes[&pos].biomass;
+                    let to_biomass = new_nodes[&npos].biomass;
+                    new_edges.push(BranchEdge {
                         from: pos,
                         to: npos,
                         thickness: (from_biomass + to_biomass) * 0.5,
@@ -89,16 +89,40 @@ pub fn extract_branch_graph(
             }
         }
     }
+
+    if new_nodes.len() != graph.nodes.len()
+        || new_edges.len() != graph.edges.len()
+        || !nodes_match(&new_nodes, &graph.nodes)
+        || !edges_match(&new_edges, &graph.edges)
+    {
+        graph.nodes = new_nodes;
+        graph.edges = new_edges;
+    }
+}
+
+fn nodes_match(a: &HashMap<Hex, BranchNode>, b: &HashMap<Hex, BranchNode>) -> bool {
+    a.iter().all(|(k, v)| {
+        b.get(k)
+            .is_some_and(|other| other.biomass == v.biomass && other.region_id == v.region_id)
+    })
+}
+
+fn edges_match(a: &[BranchEdge], b: &[BranchEdge]) -> bool {
+    a.iter().zip(b.iter()).all(|(x, y)| {
+        x.from == y.from && x.to == y.to && (x.thickness - y.thickness).abs() < f32::EPSILON
+    })
 }
 
 pub fn extract_region_hulls(
     tiles: Query<(&GridPos, &Tile)>,
     layout: Res<HexLayout>,
     mut hulls: ResMut<RegionHulls>,
+    mut region_positions: Local<HashMap<RegionId, Vec<Vec2>>>,
+    mut new_hulls: Local<HashMap<RegionId, Vec<Vec2>>>,
 ) {
-    hulls.hulls.clear();
-
-    let mut region_positions: HashMap<RegionId, Vec<Vec2>> = HashMap::default();
+    for v in region_positions.values_mut() {
+        v.clear();
+    }
     for (gpos, tile) in tiles.iter() {
         if let Some(rid) = tile.region_id {
             region_positions
@@ -108,9 +132,13 @@ pub fn extract_region_hulls(
         }
     }
 
-    for (rid, positions) in region_positions {
+    new_hulls.clear();
+    for (rid, positions) in region_positions.iter() {
+        if positions.is_empty() {
+            continue;
+        }
         if positions.len() < 2 {
-            hulls.hulls.insert(rid, positions);
+            new_hulls.insert(*rid, positions.clone());
             continue;
         }
         let min_x = positions.iter().map(|p| p.x).fold(f32::INFINITY, f32::min);
@@ -123,8 +151,8 @@ pub fn extract_region_hulls(
             .iter()
             .map(|p| p.y)
             .fold(f32::NEG_INFINITY, f32::max);
-        hulls.hulls.insert(
-            rid,
+        new_hulls.insert(
+            *rid,
             vec![
                 Vec2::new(min_x - 0.5, min_y - 0.5),
                 Vec2::new(max_x + 0.5, min_y - 0.5),
@@ -133,59 +161,69 @@ pub fn extract_region_hulls(
             ],
         );
     }
+
+    region_positions.retain(|_, v| !v.is_empty());
+
+    if !hulls_match(&new_hulls, &hulls.hulls) {
+        hulls.hulls.clone_from(&new_hulls);
+    }
 }
 
-pub fn extract_discovery_map(graph: Res<BranchGraph>, mut discovery: ResMut<DiscoveryMap>) {
-    discovery.discovered.clear();
+fn hulls_match(a: &HashMap<RegionId, Vec<Vec2>>, b: &HashMap<RegionId, Vec<Vec2>>) -> bool {
+    a.len() == b.len() && a.iter().all(|(k, v)| b.get(k) == Some(v))
+}
 
-    let radius: u32 = 8;
-    let fully_hidden_threshold: f32 = 0.02;
-    let fully_visible_threshold: f32 = 0.12;
+pub fn extract_discovery_map(
+    graph: Res<BranchGraph>,
+    mut discovery: ResMut<DiscoveryMap>,
+    mut influence_map: Local<HashMap<Hex, f32>>,
+    mut new_discovered: Local<HashMap<Hex, f32>>,
+) {
+    if !graph.is_changed() {
+        return;
+    }
 
-    let mut influence_map: HashMap<Hex, f32> = HashMap::new();
+    const RADIUS: u32 = 8;
+    const FULLY_HIDDEN: f32 = 0.02;
+    const FULLY_VISIBLE: f32 = 0.12;
 
-    // Network tiles are always fully visible
+    influence_map.clear();
     for &node_pos in graph.nodes.keys() {
         influence_map.insert(node_pos, f32::MAX);
     }
 
     for &node_pos in graph.nodes.keys() {
-        // Use hex range iteration instead of rectangular dx/dy loops
-        for tile in node_pos.range(radius) {
-            // Skip tiles that are network nodes -- already fully visible
+        for tile in node_pos.range(RADIUS) {
             if graph.nodes.contains_key(&tile) {
                 continue;
             }
-
             let hex_dist = tile.unsigned_distance_to(node_pos) as f32;
-
-            // Noise jitter on the effective distance to break up the boundary
             let noise = (tile.x.wrapping_mul(73_856_093) ^ tile.y.wrapping_mul(19_349_663)) as f32
                 / (i32::MAX as f32);
-            let jittered_dist = hex_dist + noise * 1.5;
-
-            if jittered_dist > radius as f32 {
+            if hex_dist + noise * 1.5 > RADIUS as f32 {
                 continue;
             }
-
             let influence = 1.0 / (hex_dist * hex_dist + 1.0);
             *influence_map.entry(tile).or_default() += influence;
         }
     }
 
-    for (tile, influence) in &influence_map {
-        let discovered = if *influence <= fully_hidden_threshold {
+    new_discovered.clear();
+    for (tile, influence) in influence_map.iter() {
+        let discovered = if *influence <= FULLY_HIDDEN {
             0.0
-        } else if *influence >= fully_visible_threshold {
+        } else if *influence >= FULLY_VISIBLE {
             1.0
         } else {
-            (*influence - fully_hidden_threshold)
-                / (fully_visible_threshold - fully_hidden_threshold)
+            (*influence - FULLY_HIDDEN) / (FULLY_VISIBLE - FULLY_HIDDEN)
         };
-
         if discovered > 0.0 {
-            discovery.discovered.insert(*tile, discovered);
+            new_discovered.insert(*tile, discovered);
         }
+    }
+
+    if discovery.discovered != *new_discovered {
+        discovery.discovered.clone_from(&new_discovered);
     }
 }
 

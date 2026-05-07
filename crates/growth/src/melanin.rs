@@ -1,14 +1,10 @@
 use bevy::prelude::*;
 use kingdom_core::{
-    BIOMASS_SNAP_EPSILON, GridPos, MELANIN_FROM_RADIATION, RADIATION_DEPLETION_RATE, RegionStates,
-    Tile,
+    BIOMASS_SNAP_EPSILON, MELANIN_FROM_RADIATION, RADIATION_DEPLETION_RATE, RegionStates, Tile,
 };
 
-pub fn melanin_system(
-    mut tiles: Query<(&GridPos, &mut Tile)>,
-    mut region_states: ResMut<RegionStates>,
-) {
-    for (_gpos, mut tile) in tiles.iter_mut() {
+pub fn melanin_system(mut tiles: Query<&mut Tile>, mut region_states: ResMut<RegionStates>) {
+    for mut tile in tiles.iter_mut() {
         if !tile.is_owned() {
             continue;
         }
@@ -30,7 +26,7 @@ pub fn melanin_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kingdom_core::{GridWorld, Hex};
+    use kingdom_core::{GridPos, GridWorld, Hex};
 
     fn test_app() -> App {
         let mut app = App::new();

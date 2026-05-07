@@ -23,9 +23,6 @@ pub fn default_input_map() -> InputMap<Action> {
 
     map.insert_axis(Action::Zoom, MouseScrollAxis::Y);
 
-    // Paint is bound to the left mouse button. The wisp state machine
-    // disambiguates tap-vs-drag and emits TileTapped for taps; selection_system
-    // reads that message rather than a dedicated SelectTile action.
     map.insert(Action::Paint, MouseButton::Left);
 
     map.insert(Action::TogglePause, KeyCode::Space);

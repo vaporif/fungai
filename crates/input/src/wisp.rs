@@ -1,18 +1,19 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 
 use bevy::ecs::message::{Message, MessageWriter};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use kingdom_core::{
-    BIAS_MAGNITUDE_CAP, BIAS_STROKE_INTENSITY, DRAG_THRESHOLD_PX, GridPos, GridWorld, Hex,
-    HexLayout, SAMPLE_HEX_DISTANCE, SAMPLE_INTERVAL_MS, TAP_TIME_MS, Tile, WISP_SENSE_RADIUS_HEX,
+    BIAS_MAGNITUDE_CAP, BIAS_STROKE_INTENSITY, DRAG_THRESHOLD_PX, GamePhase, GridPos, GridWorld,
+    Hex, HexLayout, SAMPLE_HEX_DISTANCE, SAMPLE_INTERVAL_MS, TAP_TIME_MS, Tile,
+    WISP_SENSE_RADIUS_HEX,
 };
 use leafwing_input_manager::prelude::*;
 
 use crate::action::Action;
 use crate::camera::GameCamera;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Copy, Debug)]
 pub enum WispPhase {
     #[default]
     Idle,
@@ -29,6 +30,7 @@ pub enum WispPhase {
 #[derive(Resource, Default)]
 pub struct WispState {
     pub phase: WispPhase,
+    owned: HashSet<Hex>,
 }
 
 #[derive(Message)]
@@ -36,12 +38,11 @@ pub struct TileTapped {
     pub pos: Hex,
 }
 
-// Many params, but they're all genuinely needed by the state machine. Bundling
-// them into a wrapper struct just to silence clippy hurts readability.
 #[allow(clippy::too_many_arguments)]
 pub fn wisp_input_system(
     actions: Res<ActionState<Action>>,
     time: Res<Time>,
+    phase: Res<GamePhase>,
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     ui_interactions: Query<&Interaction, With<Button>>,
@@ -51,9 +52,10 @@ pub fn wisp_input_system(
     mut wisp: ResMut<WispState>,
     mut taps: MessageWriter<TileTapped>,
 ) {
-    // Don't consume clicks that land on UI buttons (slot machine, game-screen
-    // buttons, etc). Otherwise tapping a UI button also paints / taps the
-    // tile underneath.
+    if *phase != GamePhase::Playing {
+        wisp.phase = WispPhase::Idle;
+        return;
+    }
     if ui_interactions
         .iter()
         .any(|i| !matches!(i, Interaction::None))
@@ -70,22 +72,11 @@ pub fn wisp_input_system(
     let just_pressed = actions.just_pressed(&Action::Paint);
     let just_released = actions.just_released(&Action::Paint);
 
-    // Skip the per-tile snapshot allocation when the wisp has nothing to do
-    // this frame (no edge events and not currently held down).
     if !pressed && !just_pressed && !just_released {
         return;
     }
 
-    // Snapshot owned hex positions before any mutable tile borrow. The
-    // proximity BFS later runs against this set, so the `tiles.get_mut(...)`
-    // call inside `write_segment` doesn't fight the immutable iteration.
-    let owned: HashSet<Hex> = tiles
-        .iter()
-        .filter_map(|(gp, t)| t.region_id.is_some().then_some(gp.0))
-        .collect();
-
-    let prev = std::mem::take(&mut wisp.phase);
-    let next = match prev {
+    wisp.phase = match wisp.phase {
         WispPhase::Idle => {
             if just_pressed {
                 WispPhase::Primed {
@@ -109,7 +100,15 @@ pub fn wisp_input_system(
                 }
                 WispPhase::Idle
             } else if pressed && cursor_world.distance(start_pos) > DRAG_THRESHOLD_PX {
-                write_segment(start_pos, cursor_world, &layout, &grid, &owned, &mut tiles);
+                refresh_owned(&mut wisp.owned, &tiles);
+                write_segment(
+                    start_pos,
+                    cursor_world,
+                    &layout,
+                    &grid,
+                    &wisp.owned,
+                    &mut tiles,
+                );
                 WispPhase::Stroking {
                     last_sample_pos: cursor_world,
                     last_sample_time: now,
@@ -133,12 +132,13 @@ pub fn wisp_input_system(
                 if elapsed_ms > SAMPLE_INTERVAL_MS as f32
                     || cursor_world.distance(last_sample_pos) > SAMPLE_HEX_DISTANCE * hex_size
                 {
+                    refresh_owned(&mut wisp.owned, &tiles);
                     write_segment(
                         last_sample_pos,
                         cursor_world,
                         &layout,
                         &grid,
-                        &owned,
+                        &wisp.owned,
                         &mut tiles,
                     );
                     WispPhase::Stroking {
@@ -156,7 +156,6 @@ pub fn wisp_input_system(
             }
         }
     };
-    wisp.phase = next;
 }
 
 fn cursor_world_position(
@@ -169,6 +168,15 @@ fn cursor_world_position(
     camera.viewport_to_world_2d(cam_xform, cursor).ok()
 }
 
+fn refresh_owned(owned: &mut HashSet<Hex>, tiles: &Query<(&GridPos, &mut Tile)>) {
+    owned.clear();
+    owned.extend(
+        tiles
+            .iter()
+            .filter_map(|(gp, t)| t.region_id.is_some().then_some(gp.0)),
+    );
+}
+
 fn write_segment(
     p1: Vec2,
     p2: Vec2,
@@ -178,61 +186,51 @@ fn write_segment(
     tiles: &mut Query<(&GridPos, &mut Tile)>,
 ) {
     let direction = (p2 - p1).normalize_or_zero();
-    if direction.length_squared() < 1e-6 {
+    if direction == Vec2::ZERO {
         return;
     }
     let hex = layout.world_pos_to_hex(p2);
     let Some(&entity) = grid.tiles.get(&hex) else {
         return;
     };
-    let falloff = network_proximity_factor(hex, grid, owned);
+    let falloff = network_proximity_factor(hex, owned);
     if falloff <= 0.0 {
         return;
     }
     let Ok((_, mut tile)) = tiles.get_mut(entity) else {
         return;
     };
-    let new_bias = tile.priority_bias + direction * BIAS_STROKE_INTENSITY * falloff;
-    let mag = new_bias.length();
-    tile.priority_bias = if mag > BIAS_MAGNITUDE_CAP {
-        new_bias * (BIAS_MAGNITUDE_CAP / mag)
+    let candidate = tile.priority_bias + direction * BIAS_STROKE_INTENSITY * falloff;
+    let mag = candidate.length();
+    let new_bias = if mag > BIAS_MAGNITUDE_CAP {
+        candidate * (BIAS_MAGNITUDE_CAP / mag)
     } else {
-        new_bias
+        candidate
     };
+    if tile.priority_bias != new_bias {
+        tile.priority_bias = new_bias;
+    }
 }
 
-fn network_proximity_factor(hex: Hex, grid: &GridWorld, owned: &HashSet<Hex>) -> f32 {
+fn network_proximity_factor(hex: Hex, owned: &HashSet<Hex>) -> f32 {
     if owned.is_empty() {
         return 0.0;
     }
-    // BFS up to WISP_SENSE_RADIUS_HEX over the GridWorld topology. Returns a
-    // 1.0..0.0 falloff scaled by hex distance to the nearest owned tile.
-    let mut frontier: VecDeque<(Hex, i32)> = VecDeque::new();
-    frontier.push_back((hex, 0));
-    let mut seen = HashSet::new();
-    seen.insert(hex);
-    while let Some((current, dist)) = frontier.pop_front() {
-        if dist > WISP_SENSE_RADIUS_HEX {
-            continue;
-        }
-        if owned.contains(&current) {
-            return 1.0 - (dist as f32) / (WISP_SENSE_RADIUS_HEX as f32 + 1.0);
-        }
-        for (npos, _) in grid.neighbors(current) {
-            if seen.insert(npos) {
-                frontier.push_back((npos, dist + 1));
-            }
-        }
+    let radius = WISP_SENSE_RADIUS_HEX as u32;
+    let nearest = owned
+        .iter()
+        .map(|o| hex.unsigned_distance_to(*o))
+        .min()
+        .unwrap_or(u32::MAX);
+    if nearest > radius {
+        return 0.0;
     }
-    0.0
+    1.0 - (nearest as f32) / (radius as f32 + 1.0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Full state-machine timing tests live in T7 integration tests where the
-    // cursor / window / time can be driven deterministically.
 
     #[test]
     fn wisp_state_default_is_idle() {
