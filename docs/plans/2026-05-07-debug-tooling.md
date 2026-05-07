@@ -231,7 +231,7 @@ git commit -m "diag: add trace feature for Tracy frame profiling"
 
 `bevy_mod_debugdump` for Bevy 0.18 is published at version `0.18.x`. Verify the exact patch version on crates.io at install time.
 
-- [ ] **Step 1: Add the dependency to `bin/Cargo.toml`**
+- [x] **Step 1: Add the dependency to `bin/Cargo.toml`**
 
 In `bin/Cargo.toml`, extend the `[dependencies]` block. The crate has to match Bevy 0.18 — pick the latest `0.18.*` release on crates.io:
 
@@ -241,7 +241,7 @@ bevy_mod_debugdump = "0.18"
 
 If `cargo search bevy_mod_debugdump` shows no `0.18.x` release, fall back to the highest published version that depends on `bevy = "0.18"` (check the crate's `Cargo.toml` on crates.io). Document the chosen version in the commit message.
 
-- [ ] **Step 2: Add the CLI flag**
+- [x] **Step 2: Add the CLI flag**
 
 Replace the body of `bin/src/cli.rs` with:
 
@@ -286,7 +286,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Wire the dump path through `main`**
+- [x] **Step 3: Wire the dump path through `main`**
 
 Replace `bin/src/main.rs` with:
 
@@ -331,12 +331,12 @@ fn main() {
 
 Note: `bevy_mod_debugdump::schedule_graph_dot` builds plugins through `app.finish()` internally on most versions. If the API in the version you pinned differs (e.g. requires explicit `app.finish()` and `app.cleanup()` calls first, or returns `Result<String, _>` instead of `String`), adjust to match what `cargo doc -p bevy_mod_debugdump --open` shows. Don't guess — read the docs.
 
-- [ ] **Step 4: Run the CLI test**
+- [x] **Step 4: Run the CLI test**
 
 Run: `cargo nextest run -p kingdom cli_parses_dump_schedule_flag`
 Expected: PASS.
 
-- [ ] **Step 5: Smoke-test the dump end-to-end**
+- [x] **Step 5: Smoke-test the dump end-to-end**
 
 Run:
 ```
@@ -344,12 +344,12 @@ cargo run -p kingdom --bin TheFifthKingdom -- --dump-schedule target/schedule.do
 ```
 Expected: process exits within a few seconds (no game window) and `target/schedule.dot` exists with non-empty DOT content (`head -5 target/schedule.dot` should show `digraph` at the top).
 
-- [ ] **Step 6: Run the lint pass**
+- [x] **Step 6: Run the lint pass**
 
 Run: `just lint`
 Expected: no warnings.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```
 git add bin/Cargo.toml bin/src/cli.rs bin/src/main.rs

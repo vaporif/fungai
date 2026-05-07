@@ -13,8 +13,24 @@ use plugins::KingdomPlugins;
 fn main() {
     let args = Args::parse();
     let seed = args.seed.unwrap_or_else(default_seed);
-    App::new()
-        .insert_resource(LaunchConfig { seed })
-        .add_plugins((DefaultPlugins, KingdomPlugins, DebugPlugin))
-        .run();
+
+    let mut app = App::new();
+    app.insert_resource(LaunchConfig { seed }).add_plugins((
+        DefaultPlugins,
+        KingdomPlugins,
+        DebugPlugin,
+    ));
+
+    if let Some(path) = args.dump_schedule {
+        let dot = bevy_mod_debugdump::schedule_graph_dot(
+            &mut app,
+            Update,
+            &bevy_mod_debugdump::schedule_graph::Settings::default(),
+        );
+        std::fs::write(&path, dot).expect("write schedule DOT");
+        eprintln!("schedule dumped to {}", path.display());
+        return;
+    }
+
+    app.run();
 }

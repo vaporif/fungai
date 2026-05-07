@@ -12,6 +12,7 @@ trace = ["bevy/trace_tracy"]
 
 [dependencies]
 bevy = { workspace = true }
+bevy_mod_debugdump = "0.15"
 clap = { version = "4", features = ["derive"] }
 image = { workspace = true, optional = true }
 kingdom_core = { workspace = true }
