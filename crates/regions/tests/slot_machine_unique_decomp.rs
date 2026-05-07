@@ -54,7 +54,6 @@ fn unique_decomp_to_slot_machine_pipeline() {
         .tiles
         .insert(pos, e);
 
-    // Force progress near completion.
     app.world_mut()
         .resource_mut::<DecompProgress>()
         .entries

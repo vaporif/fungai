@@ -208,7 +208,7 @@ mod tests {
                 region_id: Some(rid),
                 biomass: 1.0,
                 moisture: 1.0,
-                priority_bias: dir * 1.0,
+                priority_bias: dir,
                 ..default()
             },
         );

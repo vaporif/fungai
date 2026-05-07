@@ -11,16 +11,13 @@ pub fn moisture_diffusion_system(mut tiles: Query<(&GridPos, &mut Tile)>, grid: 
             tile.moisture = 1.0;
             continue;
         }
-        let mut total_diff = 0.0_f32;
-        let mut count = 0_f32;
-        for (npos, _) in grid.neighbors(gpos.0) {
-            if let Some(&n_moist) = snapshot.get(&npos) {
-                total_diff += n_moist - tile.moisture;
-                count += 1.0;
-            }
-        }
-        if count > 0.0 {
-            tile.moisture += MOISTURE_DIFFUSION_RATE * (total_diff / count);
+        let diffs: Vec<f32> = grid
+            .neighbors(gpos.0)
+            .filter_map(|(npos, _)| snapshot.get(&npos).map(|&n_moist| n_moist - tile.moisture))
+            .collect();
+        if !diffs.is_empty() {
+            let avg_diff = diffs.iter().sum::<f32>() / diffs.len() as f32;
+            tile.moisture += MOISTURE_DIFFUSION_RATE * avg_diff;
             tile.moisture = tile.moisture.clamp(0.0, 1.0);
         }
     }

@@ -173,7 +173,7 @@ mod tests {
             .resource_mut::<RegionStates>()
             .create_region();
         let pos = Hex::new(3, 3);
-        spawn(
+        let entity = spawn(
             &mut app,
             pos,
             Tile {
@@ -188,13 +188,7 @@ mod tests {
         for _ in 0..51 {
             app.update();
         }
-        let tile = app
-            .world_mut()
-            .query::<&Tile>()
-            .iter(app.world())
-            .next()
-            .unwrap()
-            .clone();
+        let tile = app.world().get::<Tile>(entity).unwrap();
         assert!(
             tile.contents.is_none(),
             "expected contents cleared after ~50 ticks, was {:?}",

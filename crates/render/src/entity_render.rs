@@ -167,7 +167,7 @@ pub fn despawn_orphaned_organism_sprites(
 
 #[derive(Component)]
 pub struct BiasGlowMarker {
-    /// Tile entity this glow tracks. Used to despawn when its tile drops below threshold.
+    /// Tile entity this glow tracks.
     source: Entity,
 }
 
@@ -181,11 +181,10 @@ pub fn bias_glow_render_system(
         return;
     }
 
-    let mut existing_by_source: HashMap<Entity, Entity> =
-        HashMap::with_capacity(existing.iter().len());
-    for (glow_e, marker) in existing.iter() {
-        existing_by_source.insert(marker.source, glow_e);
-    }
+    let existing_by_source: HashMap<Entity, Entity> = existing
+        .iter()
+        .map(|(glow_e, marker)| (marker.source, glow_e))
+        .collect();
 
     let quad_size = Vec2::splat(layout.scale.x * 1.6);
 

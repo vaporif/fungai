@@ -310,7 +310,6 @@ mod tests {
         app.add_systems(Update, spore_system);
         app.update();
 
-        // No region exists, so no tile should ever be claimed.
         let mut any_claimed = false;
         for (_gpos, tile) in app
             .world_mut()

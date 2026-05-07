@@ -157,7 +157,7 @@ mod tests {
         // Two clusters separated by a gap (non-adjacent in hex space)
         spawn_tile(&mut app, Hex::new(0, 0), Some(rid));
         spawn_tile(&mut app, Hex::new(1, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(2, 0), None); // gap
+        spawn_tile(&mut app, Hex::new(2, 0), None);
         spawn_tile(&mut app, Hex::new(3, 0), Some(rid));
         spawn_tile(&mut app, Hex::new(4, 0), Some(rid));
 

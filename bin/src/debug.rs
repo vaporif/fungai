@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use bevy::diagnostic::{
     DiagnosticPath, DiagnosticsStore, EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin,
     SystemInformationDiagnosticsPlugin,
@@ -58,13 +60,17 @@ fn log_diagnostics(world: &World, mut last_log: Local<f32>) {
          cpu={cpu_pct:.1}% mem={mem_mib:.0}MiB elapsed={now:.0}s"
     );
 
+    log_archetype_buckets(world);
+}
+
+fn log_archetype_buckets(world: &World) {
     let components = world.components();
     let mut buckets: Vec<(String, u32)> = world
         .archetypes()
         .iter()
         .filter(|a| !a.is_empty())
         .map(|archetype| {
-            let mut names: Vec<String> = archetype
+            let names: BTreeSet<String> = archetype
                 .components()
                 .iter()
                 .filter_map(|cid| {
@@ -73,20 +79,13 @@ fn log_diagnostics(world: &World, mut last_log: Local<f32>) {
                         .map(|info| info.name().shortname().to_string())
                 })
                 .collect();
-            names.sort_unstable();
-            names.dedup();
             let label = if names.is_empty() {
                 "<empty>".to_string()
             } else if names.len() <= 4 {
-                names.join("+")
+                names.into_iter().collect::<Vec<_>>().join("+")
             } else {
-                format!(
-                    "{}+{}+{}+...({} more)",
-                    names[0],
-                    names[1],
-                    names[2],
-                    names.len() - 3
-                )
+                let head: Vec<String> = names.iter().take(3).cloned().collect();
+                format!("{}+...({} more)", head.join("+"), names.len() - 3)
             };
             (label, archetype.len())
         })
