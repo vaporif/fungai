@@ -2636,19 +2636,19 @@ git commit -m "T5: wisp drag-paint replaces P-key; bias glow renders warm trail"
 
 **Note on parallelism:** runs in parallel with T3. Files do not overlap with T3 (which owns growth + world + render).
 
-- [ ] **Step 1: Verify baseline (T2 complete)**
+- [x] **Step 1: Verify baseline (T2 complete)**
 
 ```bash
 just lint && just test && git status
 ```
 
-- [ ] **Step 2: Read the current hud.rs to find specialization references**
+- [x] **Step 2: Read the current hud.rs to find specialization references**
 
 ```bash
 rg -n "specialization|nutrients|energy|biomass" crates/ui/src/hud.rs
 ```
 
-- [ ] **Step 3: Update `crates/ui/src/hud.rs`**
+- [x] **Step 3: Update `crates/ui/src/hud.rs`**
 
 The HUD should display per-region or aggregated:
 - Sugars: sum across regions or per-selected-region
@@ -2667,7 +2667,7 @@ The exact pattern depends on whether the HUD uses Bevy `Text2d` or `bevy_ui` `Te
 
 If the HUD currently shows `region.nutrients` and `region.energy`, replace with a single `region.sugars` line. Add a `region.melanin` line.
 
-- [ ] **Step 4: Update `crates/ui/src/tile_popover.rs`**
+- [x] **Step 4: Update `crates/ui/src/tile_popover.rs`**
 
 The popover should display, when a tile is selected:
 - Terrain type
@@ -2680,25 +2680,25 @@ The popover should display, when a tile is selected:
 
 Drop any specialization-related rows.
 
-- [ ] **Step 5: Verify compilation**
+- [x] **Step 5: Verify compilation**
 
 ```bash
 cargo check --workspace --all-features --all-targets
 ```
 
-- [ ] **Step 6: Run UI tests**
+- [x] **Step 6: Run UI tests**
 
 ```bash
 cargo nextest run -p kingdom_ui
 ```
 
-- [ ] **Step 7: Run full suite**
+- [x] **Step 7: Run full suite**
 
 ```bash
 just test
 ```
 
-- [ ] **Step 8: Smoke test**
+- [x] **Step 8: Smoke test**
 
 ```bash
 just dev
@@ -2706,13 +2706,13 @@ just dev
 
 Expected: HUD shows `Sugars: <n>` and `Melanin: <n>` (will both be 0 unless T4 has shipped — by the parallel-batch convention T6 runs alongside T3, not T4, so resources may be at zero on smoke test; acceptable).
 
-- [ ] **Step 9: Run lints**
+- [x] **Step 9: Run lints**
 
 ```bash
 just lint
 ```
 
-- [ ] **Step 10: Commit T6**
+- [x] **Step 10: Commit T6**
 
 ```bash
 git add -A
