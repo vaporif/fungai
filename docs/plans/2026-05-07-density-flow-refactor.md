@@ -90,7 +90,7 @@ Each task ends with the same two commands plus an explicit commit per verified s
 
 **Preserved despite being unused for now:** `crates/regions/src/mutation.rs`, `crates/ui/src/slot_machine_ui.rs`, `crates/ai/src/organisms.rs`, `crates/ai/src/environment.rs`. The slot machine and organism systems remain in the codebase.
 
-- [ ] **Step 1: Verify baseline state**
+- [x] **Step 1: Verify baseline state**
 
 ```bash
 just lint && just test
@@ -98,31 +98,31 @@ just lint && just test
 
 Expected: both pass cleanly.
 
-- [ ] **Step 2: Delete specialization plugin file**
+- [x] **Step 2: Delete specialization plugin file**
 
 ```bash
 rm crates/regions/src/specialization.rs
 ```
 
-- [ ] **Step 3: Delete rival and combat AI files**
+- [x] **Step 3: Delete rival and combat AI files**
 
 ```bash
 rm crates/ai/src/rival.rs crates/ai/src/combat.rs
 ```
 
-- [ ] **Step 4: Delete UI files for ability bar and specialization picker**
+- [x] **Step 4: Delete UI files for ability bar and specialization picker**
 
 ```bash
 rm crates/ui/src/ability_bar.rs crates/ui/src/spec_picker.rs
 ```
 
-- [ ] **Step 5: Delete input specialization handler**
+- [x] **Step 5: Delete input specialization handler**
 
 ```bash
 rm crates/input/src/specialization_input.rs
 ```
 
-- [ ] **Step 6: Extract `UnlockPool` + `UnlockOption` into a new `unlock.rs` module**
+- [x] **Step 6: Extract `UnlockPool` + `UnlockOption` into a new `unlock.rs` module**
 
 `UnlockPool` and `UnlockOption` (currently in `abilities.rs:14-26`) are still consumed by `slot_machine.rs` and `mutation.rs` after T4. They must survive the deletion of `abilities.rs`. Create `crates/core/src/unlock.rs`:
 
@@ -147,20 +147,20 @@ pub struct UnlockOption {
 
 The other items in `abilities.rs` (`ActiveAbility`, `ActiveEffect`, `AbilityEffectType`) are abilities-only and die with the file — do not move them.
 
-- [ ] **Step 7: Delete the abilities module**
+- [x] **Step 7: Delete the abilities module**
 
 ```bash
 rm crates/core/src/abilities.rs
 ```
 
-- [ ] **Step 8: Update `crates/core/src/lib.rs` — swap `abilities` for `unlock`, drop `StudyComplete` registration**
+- [x] **Step 8: Update `crates/core/src/lib.rs` — swap `abilities` for `unlock`, drop `StudyComplete` registration**
 
 Edit `crates/core/src/lib.rs`:
 - Replace `mod abilities;` with `mod unlock;`
 - Replace `pub use abilities::*;` with `pub use unlock::*;`
 - Remove `.add_message::<StudyComplete>()` line from `CorePlugin::build`
 
-- [ ] **Step 9: Update `crates/core/src/messages.rs` to remove `StudyComplete`**
+- [x] **Step 9: Update `crates/core/src/messages.rs` to remove `StudyComplete`**
 
 Open `crates/core/src/messages.rs`. Remove the `StudyComplete` struct definition entirely. The `use crate::abilities::UnlockPool` import at the top is dead after `StudyComplete` is gone — drop it. Verify with:
 
@@ -170,7 +170,7 @@ rg "StudyComplete" crates bin
 
 Expected output: empty (no references after this step).
 
-- [ ] **Step 10: Update `crates/core/src/region.rs` to strip specialization fields**
+- [x] **Step 10: Update `crates/core/src/region.rs` to strip specialization fields**
 
 Replace the body of `RegionState` with just:
 
@@ -199,13 +199,13 @@ impl RegionState {
 
 Delete `SpecializationType` enum, `SPEC_TIER_1/2/3` constants, and `tier()` method. T2 will rename / replace `nutrients`, `energy`, `biomass` — for now keep the fields so consumers compile.
 
-- [ ] **Step 11: Update `crates/regions/src/discovery.rs` to delete `explorer_discovery_system`, `researcher_study_system`, `StudyProgress`**
+- [x] **Step 11: Update `crates/regions/src/discovery.rs` to delete `explorer_discovery_system`, `researcher_study_system`, `StudyProgress`**
 
 Open the file. Delete the `explorer_discovery_system` function, the `researcher_study_system` function, and the `StudyProgress` struct (and its `Default` derive). Keep `decomposer_discovery_system` and `DecompProgress` — they will be universalised in T4. Delete the `explorer_tip_discovers_tile` and `researcher_completes_study` tests; keep `decomposer_breaks_down_unique_decomposable` (it will be rewritten in T4).
 
 Remove specialization conditional from `decomposer_discovery_system` (the `is_decomposer` check), but leave the function body otherwise intact for now — T4 owns the universalisation.
 
-- [ ] **Step 12: Update `crates/regions/src/lib.rs`**
+- [x] **Step 12: Update `crates/regions/src/lib.rs`**
 
 Drop:
 - `mod specialization;`
@@ -219,7 +219,7 @@ Drop:
 
 After edits, `RegionsPlugin` registers: `DiscoveryPlugin` (with only decomposer system), `UnlockPlugin` (slot machine + mutation if still compiles), `FragmentPlugin`.
 
-- [ ] **Step 13: Update `crates/regions/src/slot_machine.rs` to drop `StudyComplete` consumer**
+- [x] **Step 13: Update `crates/regions/src/slot_machine.rs` to drop `StudyComplete` consumer**
 
 The current `slot_machine_system` reads `StudyComplete`. With `StudyComplete` deleted, replace the reader with one that reads nothing for now (the system body becomes a noop) — T4 will rewire it to read `DecompositionComplete`. Make the simplest stub:
 
@@ -237,7 +237,7 @@ The `#[allow(...)]` is intentional — the params will be used again in T4. With
 
 Delete the `slot_machine_produces_three_options` test (it tested the StudyComplete path). T4 step 4 adds a replacement test; the gap between T1 and T4 is intentional and acceptable.
 
-- [ ] **Step 14: Update `crates/ai/src/lib.rs`**
+- [x] **Step 14: Update `crates/ai/src/lib.rs`**
 
 Replace the entire file with:
 
@@ -310,7 +310,7 @@ impl Plugin for AiPlugin {
 
 `AiPlugin` retained as a convenience aggregator. The `NeutralFungiMerged` registration migrates into `OrganismsPlugin` so it stays registered when `bin/src/plugins.rs` adds `OrganismsPlugin` directly without `AiPlugin`.
 
-- [ ] **Step 15: Update `crates/ui/src/lib.rs`**
+- [x] **Step 15: Update `crates/ui/src/lib.rs`**
 
 Drop:
 - `mod ability_bar;` and any re-exports
@@ -318,7 +318,7 @@ Drop:
 
 Drop the corresponding plugin registrations or system registrations from `UiPlugin::build`. Keep `slot_machine_ui` registered. Read the file, remove specifically those entries.
 
-- [ ] **Step 16: Update `crates/input/src/lib.rs`**
+- [x] **Step 16: Update `crates/input/src/lib.rs`**
 
 Drop:
 - `mod specialization_input;`
@@ -326,11 +326,11 @@ Drop:
 - `specialization_input_system` from any system registration in `InputPlugin::build`
 - `mod priority;` and re-exports — actually keep for now, T5 deletes it.
 
-- [ ] **Step 17: Update `crates/input/src/action.rs` to drop `Spec1`..`Spec8`**
+- [x] **Step 17: Update `crates/input/src/action.rs` to drop `Spec1`..`Spec8`**
 
 Open the file. Remove the eight `Spec1..Spec8` variants from the `Action` enum. Remove the eight `map.insert(Action::Spec*, KeyCode::Digit*)` calls from `default_input_map`. Leave `SetPriority` and `ClearPriority` in place — T5 removes them.
 
-- [ ] **Step 18: Update `crates/render/src/data_layer.rs` to drop rival graph extraction and `BranchNode.specialization`**
+- [x] **Step 18: Update `crates/render/src/data_layer.rs` to drop rival graph extraction and `BranchNode.specialization`**
 
 Open the file. Make these changes:
 
@@ -342,7 +342,7 @@ Open the file. Make these changes:
 
 Leave `BranchGraph`, `TipPositions`, `RegionHulls`, `DiscoveryMap`, `PriorityBiasMap`, `SelectedRegionTiles` (TipPositions is removed in T3, not here).
 
-- [ ] **Step 19: Update `crates/render/src/network_render.rs` to drop rival graph rendering and replace `region_color_linear`**
+- [x] **Step 19: Update `crates/render/src/network_render.rs` to drop rival graph rendering and replace `region_color_linear`**
 
 Open the file. Make these changes:
 
@@ -398,13 +398,13 @@ fn region_color_distinguishes_region_ids() {
 
 7. Drop `use kingdom_core::SpecializationType` and any `use kingdom_core::*` imports that pulled in spec-specific items.
 
-- [ ] **Step 20: Update `crates/render/src/lib.rs`**
+- [x] **Step 20: Update `crates/render/src/lib.rs`**
 
 Drop:
 - The `init_resource::<data_layer::RivalBranchGraph>()` call
 - The `data_layer::extract_rival_branch_graph` from system registration tuple
 
-- [ ] **Step 21: Update `bin/src/plugins.rs` to register only the kept AI sub-plugins**
+- [x] **Step 21: Update `bin/src/plugins.rs` to register only the kept AI sub-plugins**
 
 Replace the AI line in `KingdomPlugins`:
 
@@ -419,7 +419,7 @@ Replace the AI line in `KingdomPlugins`:
 
 `AiPlugin` exists but is no longer used. Either remove the `add(AiPlugin)` line entirely (cleaner) or keep it if you want a single registration — pick removal so the dropped rival plugin can't be accidentally re-added.
 
-- [ ] **Step 22: Verify the workspace compiles**
+- [x] **Step 22: Verify the workspace compiles**
 
 ```bash
 cargo check --workspace --all-features --all-targets
@@ -436,7 +436,7 @@ Expected: clean build. Likely remaining breakage points after the previous steps
 
 For each unresolved compile error, prefer removing the call site over stubbing a placeholder. The simulation logic is being rebuilt; preserving dead reads now creates noise to clean up later.
 
-- [ ] **Step 23: Run the full test suite**
+- [x] **Step 23: Run the full test suite**
 
 ```bash
 just test
@@ -444,7 +444,7 @@ just test
 
 Expected: pass. Tests covering deleted code are gone with the files; remaining tests should still pass.
 
-- [ ] **Step 24: Run lints and format check**
+- [x] **Step 24: Run lints and format check**
 
 ```bash
 just lint

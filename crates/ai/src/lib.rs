@@ -2,41 +2,29 @@ use bevy::prelude::*;
 
 use kingdom_core::SimulationSystems;
 
-mod combat;
 mod environment;
 mod organisms;
-mod rival;
 
-pub use combat::combat_resolution_system;
 pub use environment::{EnvironmentRng, environment_threat_system};
 pub use organisms::{
     NeutralFungiMerged, bacteria_system, fauna_system, neutral_fungi_system, plant_system,
 };
-pub use rival::{RivalRng, RivalState, rival_ai_system};
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AiSystems {
-    Rival,
     Organisms,
     Environment,
-    Combat,
-}
-
-pub struct RivalAiPlugin;
-
-impl Plugin for RivalAiPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<RivalRng>()
-            .init_resource::<RivalState>()
-            .add_systems(Update, rival_ai_system.in_set(AiSystems::Rival));
-    }
 }
 
 pub struct OrganismsPlugin;
 
 impl Plugin for OrganismsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        // NeutralFungiMerged registered here (not in AiPlugin) because step 21
+        // drops AiPlugin from the binary in favor of registering the inner plugins
+        // directly. Otherwise the message has no add_message call → Bevy panics on
+        // first write.
+        app.add_message::<NeutralFungiMerged>().add_systems(
             Update,
             (
                 neutral_fungi_system,
@@ -61,35 +49,16 @@ impl Plugin for EnvironmentPlugin {
     }
 }
 
-pub struct CombatPlugin;
-
-impl Plugin for CombatPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Update, combat_resolution_system.in_set(AiSystems::Combat));
-    }
-}
-
 pub struct AiPlugin;
 
 impl Plugin for AiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<NeutralFungiMerged>()
-            .configure_sets(
-                Update,
-                (
-                    AiSystems::Rival,
-                    AiSystems::Organisms,
-                    AiSystems::Environment,
-                    AiSystems::Combat,
-                )
-                    .chain()
-                    .in_set(SimulationSystems),
-            )
-            .add_plugins((
-                RivalAiPlugin,
-                OrganismsPlugin,
-                EnvironmentPlugin,
-                CombatPlugin,
-            ));
+        app.configure_sets(
+            Update,
+            (AiSystems::Organisms, AiSystems::Environment)
+                .chain()
+                .in_set(SimulationSystems),
+        )
+        .add_plugins((OrganismsPlugin, EnvironmentPlugin));
     }
 }

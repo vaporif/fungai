@@ -13,15 +13,6 @@ pub enum Action {
     SetPriority,
     ClearPriority,
 
-    Spec1,
-    Spec2,
-    Spec3,
-    Spec4,
-    Spec5,
-    Spec6,
-    Spec7,
-    Spec8,
-
     TogglePause,
     SpeedUp,
     SlowDown,
@@ -44,15 +35,6 @@ pub fn default_input_map() -> InputMap<Action> {
         Action::ClearPriority,
         ButtonlikeChord::modified(ModifierKey::Shift, KeyCode::KeyP),
     );
-
-    map.insert(Action::Spec1, KeyCode::Digit1);
-    map.insert(Action::Spec2, KeyCode::Digit2);
-    map.insert(Action::Spec3, KeyCode::Digit3);
-    map.insert(Action::Spec4, KeyCode::Digit4);
-    map.insert(Action::Spec5, KeyCode::Digit5);
-    map.insert(Action::Spec6, KeyCode::Digit6);
-    map.insert(Action::Spec7, KeyCode::Digit7);
-    map.insert(Action::Spec8, KeyCode::Digit8);
 
     map.insert(Action::TogglePause, KeyCode::Space);
     map.insert(Action::SpeedUp, KeyCode::Equal);

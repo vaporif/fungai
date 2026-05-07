@@ -167,14 +167,9 @@ fn format_tile(hex: Hex, tile: &Tile, region_states: &RegionStates) -> String {
         .region_id()
         .and_then(|rid| region_states.get(rid))
     {
-        let spec = state
-            .specialization
-            .map(|s| format!("{s:?}"))
-            .or_else(|| state.target_specialization.map(|t| format!("-> {t:?}")))
-            .unwrap_or_else(|| "Unspecialized".into());
         out.push_str(&format!(
-            "\nRegion {}: {spec} | tiles {} | inv {:.0}",
-            state.region_id.0, state.tile_count, state.specialization_investment,
+            "\nRegion {} | tiles {}",
+            state.region_id.0, state.tile_count,
         ));
     }
 

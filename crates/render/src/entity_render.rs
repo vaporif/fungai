@@ -4,7 +4,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use kingdom_core::{
     FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout, MushroomEntity,
-    NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent, SpecializationType,
+    NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent,
 };
 
 use crate::assets::EntitySprites;
@@ -40,23 +40,15 @@ pub fn tip_render_system(
     let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
     let tip_size = Vec2::splat(inner_radius * 0.8);
 
-    for (pos, spec) in &tip_positions.tips {
-        let color = match spec {
-            Some(SpecializationType::Decomposer) => Color::srgb(0.4, 0.7, 0.3),
-            Some(SpecializationType::Explorer) => Color::srgb(1.0, 0.9, 0.3),
-            Some(SpecializationType::Parasite) => Color::srgb(0.8, 0.2, 0.2),
-            Some(SpecializationType::Researcher) => Color::srgb(0.3, 0.5, 0.9),
-            Some(SpecializationType::Hunter) => Color::srgb(0.6, 0.4, 0.1),
-            _ => Color::srgb(0.9, 0.9, 0.9),
-        };
-
+    let tip_color = Color::srgb(0.9, 0.9, 0.9);
+    for pos in &tip_positions.tips {
         let base_pos = layout.hex_to_world_pos(*pos);
         let world_pos = Vec3::new(base_pos.x, base_pos.y, 2.0);
 
         commands.spawn((
             TipSprite,
             Sprite {
-                color,
+                color: tip_color,
                 custom_size: Some(tip_size),
                 ..default()
             },

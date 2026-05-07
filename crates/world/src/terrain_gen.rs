@@ -5,7 +5,7 @@ use hexx::{Hex, HexOrientation, OffsetHexMode};
 use kingdom_core::{
     BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HyphalTip,
     LaunchConfig, NeutralFungusAgent, Occupant, PlantRootAgent, RegionId, RegionStates, RivalId,
-    SpecializationType, TerrainType, Tile, TileContents,
+    TerrainType, Tile, TileContents,
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
@@ -218,8 +218,6 @@ fn init_player_region(region_states: &mut RegionStates) -> RegionId {
     if let Some(state) = region_states.get_mut(rid) {
         state.nutrients = 100.0;
         state.energy = 20.0;
-        state.specialization = Some(SpecializationType::Decomposer);
-        state.target_specialization = Some(SpecializationType::Decomposer);
     }
     rid
 }

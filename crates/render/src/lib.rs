@@ -11,9 +11,7 @@ mod entity_render;
 mod network_render;
 mod terrain_render;
 
-pub use data_layer::{
-    BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls, RivalBranchGraph, TipPositions,
-};
+pub use data_layer::{BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls, TipPositions};
 pub use network_render::catmull_rom;
 pub use terrain_render::{terrain_base_color, terrain_type_index};
 
@@ -30,7 +28,6 @@ impl Plugin for RenderPlugin {
             .init_resource::<TipPositions>()
             .init_resource::<RegionHulls>()
             .init_resource::<data_layer::DiscoveryMap>()
-            .init_resource::<data_layer::RivalBranchGraph>()
             .init_resource::<data_layer::PriorityBiasMap>()
             .init_resource::<data_layer::SelectedRegionTiles>()
             .add_systems(
@@ -40,7 +37,6 @@ impl Plugin for RenderPlugin {
                     data_layer::extract_tip_positions,
                     data_layer::extract_region_hulls,
                     data_layer::extract_discovery_map.after(data_layer::extract_branch_graph),
-                    data_layer::extract_rival_branch_graph,
                 )
                     .in_set(SimulationSystems),
             )

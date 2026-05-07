@@ -3,8 +3,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use hexx::Hex;
 use kingdom_core::{
-    GridPos, GridWorld, HexLayout, HyphalTip, Occupant, RegionId, RegionStates, RivalId,
-    SelectedRegion, SpecializationType, Tile,
+    GridPos, GridWorld, HexLayout, HyphalTip, Occupant, RegionId, SelectedRegion, Tile,
 };
 
 #[derive(Resource, Default, Debug)]
@@ -17,7 +16,6 @@ pub struct BranchGraph {
 pub struct BranchNode {
     pub pos: Hex,
     pub biomass: f32,
-    pub specialization: Option<SpecializationType>,
     pub region_id: RegionId,
 }
 
@@ -30,7 +28,7 @@ pub struct BranchEdge {
 
 #[derive(Resource, Default, Debug)]
 pub struct TipPositions {
-    pub tips: Vec<(Hex, Option<SpecializationType>)>,
+    pub tips: Vec<Hex>,
 }
 
 #[derive(Resource, Default, Debug)]
@@ -55,23 +53,9 @@ pub struct SelectedRegionTiles {
     pub tiles: Vec<Hex>,
 }
 
-#[derive(Resource, Default, Debug)]
-pub struct RivalBranchGraph {
-    pub nodes: HashMap<Hex, RivalBranchNode>,
-    pub edges: Vec<BranchEdge>,
-}
-
-#[derive(Debug)]
-pub struct RivalBranchNode {
-    pub pos: Hex,
-    pub biomass: f32,
-    pub rival_id: RivalId,
-}
-
 pub fn extract_branch_graph(
     tiles: Query<(&GridPos, &Tile)>,
     grid: Res<GridWorld>,
-    region_states: Res<RegionStates>,
     mut graph: ResMut<BranchGraph>,
 ) {
     graph.nodes.clear();
@@ -79,13 +63,11 @@ pub fn extract_branch_graph(
 
     for (gpos, tile) in tiles.iter() {
         if let Occupant::Player(rid) = tile.occupant {
-            let spec = region_states.get(rid).and_then(|r| r.specialization);
             graph.nodes.insert(
                 gpos.0,
                 BranchNode {
                     pos: gpos.0,
                     biomass: tile.biomass,
-                    specialization: spec,
                     region_id: rid,
                 },
             );
@@ -117,19 +99,10 @@ pub fn extract_branch_graph(
 }
 
 pub fn extract_tip_positions(
-    tips: Query<(&GridPos, &HyphalTip)>,
-    region_states: Res<RegionStates>,
+    tips: Query<&GridPos, With<HyphalTip>>,
     mut tip_positions: ResMut<TipPositions>,
 ) {
-    let new_tips: Vec<(Hex, Option<SpecializationType>)> = tips
-        .iter()
-        .map(|(gpos, tip)| {
-            let spec = region_states
-                .get(tip.region_id)
-                .and_then(|r| r.specialization);
-            (gpos.0, spec)
-        })
-        .collect();
+    let new_tips: Vec<Hex> = tips.iter().map(|gpos| gpos.0).collect();
     if tip_positions.tips != new_tips {
         tip_positions.tips = new_tips;
     }
@@ -233,51 +206,6 @@ pub fn extract_discovery_map(graph: Res<BranchGraph>, mut discovery: ResMut<Disc
     }
 }
 
-pub fn extract_rival_branch_graph(
-    tiles: Query<(&GridPos, &Tile)>,
-    grid: Res<GridWorld>,
-    mut graph: ResMut<RivalBranchGraph>,
-) {
-    graph.nodes.clear();
-    graph.edges.clear();
-
-    for (gpos, tile) in tiles.iter() {
-        if let Occupant::Rival(rid) = tile.occupant {
-            graph.nodes.insert(
-                gpos.0,
-                RivalBranchNode {
-                    pos: gpos.0,
-                    biomass: tile.biomass,
-                    rival_id: rid,
-                },
-            );
-        }
-    }
-
-    let mut seen_edges: HashSet<(Hex, Hex)> = HashSet::default();
-    let node_keys: Vec<Hex> = graph.nodes.keys().copied().collect();
-    for pos in node_keys {
-        for (npos, _) in grid.neighbors(pos) {
-            if graph.nodes.contains_key(&npos) {
-                let edge_key = if pos.x < npos.x || (pos.x == npos.x && pos.y < npos.y) {
-                    (pos, npos)
-                } else {
-                    (npos, pos)
-                };
-                if seen_edges.insert(edge_key) {
-                    let from_biomass = graph.nodes[&pos].biomass;
-                    let to_biomass = graph.nodes[&npos].biomass;
-                    graph.edges.push(BranchEdge {
-                        from: pos,
-                        to: npos,
-                        thickness: (from_biomass + to_biomass) * 0.5,
-                    });
-                }
-            }
-        }
-    }
-}
-
 pub fn extract_priority_bias_map(
     tiles: Query<(&GridPos, &Tile)>,
     mut bias_map: ResMut<PriorityBiasMap>,
@@ -312,7 +240,7 @@ pub fn extract_selected_region_tiles(
 
 #[cfg(test)]
 mod tests {
-    use kingdom_core::create_hex_layout;
+    use kingdom_core::{RegionStates, create_hex_layout};
 
     use super::*;
 
@@ -385,7 +313,7 @@ mod tests {
 
         let tips = app.world().resource::<TipPositions>();
         assert_eq!(tips.tips.len(), 1);
-        assert_eq!(tips.tips[0].0, pos);
+        assert_eq!(tips.tips[0], pos);
     }
 
     #[test]
@@ -482,39 +410,6 @@ mod tests {
             !discovery.discovered.contains_key(&Hex::new(19, 10)),
             "tiles outside radius 8 should not be in the map"
         );
-    }
-
-    #[test]
-    fn rival_branch_graph_extracts_rival_tiles() {
-        let mut app = test_app();
-        app.init_resource::<RivalBranchGraph>();
-
-        let rival_id = RivalId(0);
-        for q in 0..3 {
-            let pos = Hex::new(q, 5);
-            let e = app
-                .world_mut()
-                .spawn((
-                    GridPos(pos),
-                    Tile {
-                        occupant: Occupant::Rival(rival_id),
-                        biomass: 1.0,
-                        ..default()
-                    },
-                ))
-                .id();
-            app.world_mut()
-                .resource_mut::<GridWorld>()
-                .tiles
-                .insert(pos, e);
-        }
-
-        app.add_systems(Update, extract_rival_branch_graph);
-        app.update();
-
-        let graph = app.world().resource::<RivalBranchGraph>();
-        assert_eq!(graph.nodes.len(), 3);
-        assert_eq!(graph.edges.len(), 2);
     }
 
     #[test]

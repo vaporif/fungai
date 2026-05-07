@@ -1,6 +1,5 @@
 use bevy::ecs::message::Message;
 
-use crate::abilities::UnlockPool;
 use crate::grid::Hex;
 use crate::tile::{FragmentId, TileContents};
 
@@ -11,12 +10,6 @@ pub struct TurnAdvanced;
 pub struct TileDiscovered {
     pub pos: Hex,
     pub contents: Option<TileContents>,
-}
-
-#[derive(Message)]
-pub struct StudyComplete {
-    pub pos: Hex,
-    pub pool: UnlockPool,
 }
 
 #[derive(Message)]

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 use kingdom_core::{
     ANASTOMOSIS_BIOMASS_BONUS, GridPos, GridWorld, Hex, HexLayout, HyphalTip, Occupant, RegionId,
-    RegionStates, SpecializationType, Tile,
+    RegionStates, Tile,
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
@@ -59,11 +59,7 @@ pub fn hyphal_tip_system(
         );
         let direction = combined + jitter;
 
-        let is_infiltrator = region_states
-            .get(tip.region_id)
-            .is_some_and(|r| r.specialization == Some(SpecializationType::Infiltrator));
-
-        // Score all passable neighbors, separating frontier (empty/rival) from owned
+        // Score all passable neighbors, picking the highest-scoring frontier tile
         let mut best_frontier_score = f32::NEG_INFINITY;
         let mut best_frontier_pos = None;
 
@@ -75,7 +71,7 @@ pub fn hyphal_tip_system(
                 if ntile.occupant.is_player() {
                     continue;
                 }
-                if ntile.occupant.is_rival() && !is_infiltrator {
+                if ntile.occupant.is_rival() {
                     continue;
                 }
                 let from_world = layout.hex_to_world_pos(pos);
@@ -110,15 +106,10 @@ pub fn hyphal_tip_system(
 
         if let Some(&tentity) = grid.tiles.get(target)
             && let Ok((_, mut tile)) = tiles.get_mut(tentity)
+            && tile.occupant == Occupant::Empty
         {
-            if tile.occupant == Occupant::Empty {
-                tile.occupant = Occupant::Player(*rid);
-                tile.biomass = 0.5;
-            } else if tile.occupant.is_rival() {
-                // Infiltrator flips rival tile at 50% biomass
-                tile.occupant = Occupant::Player(*rid);
-                tile.biomass *= 0.5;
-            }
+            tile.occupant = Occupant::Player(*rid);
+            tile.biomass = 0.5;
         }
 
         commands.entity(*tip_entity).insert(GridPos(*target));

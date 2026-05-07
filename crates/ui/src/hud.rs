@@ -100,7 +100,6 @@ pub fn spawn_hud(mut commands: Commands) {
                 "P \u{2014} Set growth priority on selected tile",
                 "Shift+P \u{2014} Clear growth priority",
                 "Space \u{2014} Pause  |  +/- Speed",
-                "1-8 \u{2014} Set specialization",
                 "H \u{2014} Hide hints",
             ];
             for hint in hints {
@@ -175,23 +174,13 @@ pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
 
         match state {
             Some(state) => {
-                let spec_name = state
-                    .specialization
-                    .map(|s| format!("{s:?}"))
-                    .unwrap_or_else(|| {
-                        state
-                            .target_specialization
-                            .map(|t| format!("-> {t:?}"))
-                            .unwrap_or_else(|| "Unspecialized".into())
-                    });
                 **text = format!(
-                    "{} | N:{:.0} E:{:.0} B:{:.0} | Tiles:{} | Inv:{:.0}",
-                    spec_name,
+                    "Region {} | N:{:.0} E:{:.0} B:{:.0} | Tiles:{}",
+                    state.region_id.0,
                     state.nutrients,
                     state.energy,
                     state.biomass,
                     state.tile_count,
-                    state.specialization_investment
                 );
             }
             None => {
