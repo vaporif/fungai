@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use hexx::Hex;
-use kingdom_core::{GridPos, GridWorld, HexLayout, HyphalTip, RegionId, SelectedRegion, Tile};
+use kingdom_core::{
+    CLAIM_THRESHOLD, GridPos, GridWorld, HexLayout, RegionId, SelectedRegion, Tile,
+};
 
 #[derive(Resource, Default, Debug)]
 pub struct BranchGraph {
@@ -22,11 +24,6 @@ pub struct BranchEdge {
     pub from: Hex,
     pub to: Hex,
     pub thickness: f32,
-}
-
-#[derive(Resource, Default, Debug)]
-pub struct TipPositions {
-    pub tips: Vec<Hex>,
 }
 
 #[derive(Resource, Default, Debug)]
@@ -59,8 +56,13 @@ pub fn extract_branch_graph(
     graph.nodes.clear();
     graph.edges.clear();
 
+    // THRESHOLD-GATED: only render network nodes for tiles whose biomass has
+    // actually accumulated past CLAIM_THRESHOLD. Sub-threshold flow that hasn't
+    // claimed yet is part of the simulation but not the visible network.
     for (gpos, tile) in tiles.iter() {
-        if let Some(rid) = tile.region_id {
+        if let Some(rid) = tile.region_id
+            && tile.biomass >= CLAIM_THRESHOLD
+        {
             graph.nodes.insert(
                 gpos.0,
                 BranchNode {
@@ -93,16 +95,6 @@ pub fn extract_branch_graph(
                 }
             }
         }
-    }
-}
-
-pub fn extract_tip_positions(
-    tips: Query<&GridPos, With<HyphalTip>>,
-    mut tip_positions: ResMut<TipPositions>,
-) {
-    let new_tips: Vec<Hex> = tips.iter().map(|gpos| gpos.0).collect();
-    if tip_positions.tips != new_tips {
-        tip_positions.tips = new_tips;
     }
 }
 
@@ -248,7 +240,6 @@ mod tests {
         app.init_resource::<GridWorld>();
         app.init_resource::<RegionStates>();
         app.init_resource::<BranchGraph>();
-        app.init_resource::<TipPositions>();
         app.init_resource::<RegionHulls>();
         app.insert_resource(create_hex_layout());
         app
@@ -287,31 +278,6 @@ mod tests {
         let graph = app.world().resource::<BranchGraph>();
         assert_eq!(graph.nodes.len(), 3);
         assert_eq!(graph.edges.len(), 2);
-    }
-
-    #[test]
-    fn tip_positions_extracts_tips() {
-        let mut app = test_app();
-        let rid = app
-            .world_mut()
-            .resource_mut::<RegionStates>()
-            .create_region();
-
-        let pos = Hex::new(5, 5);
-        app.world_mut().spawn((
-            GridPos(pos),
-            HyphalTip {
-                region_id: rid,
-                age: 0,
-            },
-        ));
-
-        app.add_systems(Update, extract_tip_positions);
-        app.update();
-
-        let tips = app.world().resource::<TipPositions>();
-        assert_eq!(tips.tips.len(), 1);
-        assert_eq!(tips.tips[0], pos);
     }
 
     #[test]

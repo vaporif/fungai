@@ -36,28 +36,6 @@ pub fn nutrient_gradient_system(
     }
 }
 
-pub fn nutrient_production_system(
-    tiles: Query<(&GridPos, &Tile)>,
-    mut region_states: ResMut<RegionStates>,
-) {
-    let mut tiles_per_region: HashMap<RegionId, u32> = HashMap::new();
-
-    for (_, tile) in tiles.iter() {
-        if let Some(rid) = tile.region_id {
-            *tiles_per_region.entry(rid).or_insert(0) += 1;
-        }
-    }
-
-    for (rid, state) in &mut region_states.regions {
-        let tile_count = tiles_per_region.get(rid).copied().unwrap_or(0);
-        let production = tile_count as f32 * 0.3;
-        let consumption = tile_count as f32 * 0.15;
-
-        state.sugars += production - consumption;
-        state.sugars = state.sugars.max(0.0);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,39 +109,6 @@ mod tests {
         assert!(
             dot > 0.0,
             "gradient should point toward higher nutrients, dot={dot}"
-        );
-    }
-
-    #[test]
-    fn region_with_player_tiles_produces_nutrients() {
-        let mut app = test_app();
-        let rid = app
-            .world_mut()
-            .resource_mut::<RegionStates>()
-            .create_region();
-        app.world_mut()
-            .resource_mut::<RegionStates>()
-            .get_mut(rid)
-            .expect("region exists")
-            .sugars = 5.0;
-
-        spawn_tile_at(
-            &mut app,
-            Hex::ZERO,
-            Tile {
-                region_id: Some(rid),
-                contents: Some(TileContents::OrganicMatter),
-                ..default()
-            },
-        );
-
-        app.add_systems(Update, nutrient_production_system);
-        app.update();
-
-        let rs = app.world().resource::<RegionStates>();
-        assert!(
-            rs.get(rid).expect("region exists").sugars > 5.0,
-            "player tiles should produce nutrients"
         );
     }
 }

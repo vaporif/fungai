@@ -3,9 +3,8 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use hexx::{Hex, HexOrientation, OffsetHexMode};
 use kingdom_core::{
-    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HyphalTip,
-    LaunchConfig, NeutralFungusAgent, PlantRootAgent, RegionId, RegionStates, TerrainType, Tile,
-    TileContents,
+    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, LaunchConfig,
+    NeutralFungusAgent, PlantRootAgent, RegionId, RegionStates, TerrainType, Tile, TileContents,
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
@@ -67,7 +66,6 @@ pub fn terrain_generation(
     seed_radiation(&mut tile_buf, &mut rng);
     spawn_world_tiles(&mut commands, &mut grid, tile_buf);
     spawn_agents(&mut commands, placements);
-    spawn_initial_tips(&mut commands, &grid, player_start, player_rid);
 }
 
 fn pick_terrain(rng: &mut StdRng, y: i32, depth_ratio: f32) -> TerrainType {
@@ -319,25 +317,6 @@ fn spawn_agents(commands: &mut Commands, p: Placements) {
                 spread_interval: BACTERIA_SPREAD_INTERVAL,
             },
         ));
-    }
-}
-
-fn spawn_initial_tips(
-    commands: &mut Commands,
-    grid: &GridWorld,
-    player_start: Hex,
-    player_rid: RegionId,
-) {
-    for neighbor in player_start.all_neighbors() {
-        if grid.tiles.contains_key(&neighbor) {
-            commands.spawn((
-                GridPos(neighbor),
-                HyphalTip {
-                    region_id: player_rid,
-                    age: 0,
-                },
-            ));
-        }
     }
 }
 

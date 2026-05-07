@@ -8,10 +8,7 @@ use kingdom_core::{
 };
 
 use crate::assets::EntitySprites;
-use crate::data_layer::{PriorityBiasMap, SelectedRegionTiles, TipPositions};
-
-#[derive(Component)]
-pub struct TipSprite;
+use crate::data_layer::{PriorityBiasMap, SelectedRegionTiles};
 
 #[derive(Component)]
 pub struct OrganismSprite;
@@ -21,40 +18,6 @@ pub struct OrganismSprite;
 pub fn organism_sprite_size(layout: &HexLayout) -> Vec2 {
     let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
     Vec2::splat(inner_radius * 1.4)
-}
-
-pub fn tip_render_system(
-    mut commands: Commands,
-    tip_positions: Res<TipPositions>,
-    existing: Query<Entity, With<TipSprite>>,
-    layout: Res<HexLayout>,
-) {
-    if !tip_positions.is_changed() {
-        return;
-    }
-
-    for entity in existing.iter() {
-        commands.entity(entity).despawn();
-    }
-
-    let inner_radius = layout.scale.x * 3.0_f32.sqrt() / 2.0;
-    let tip_size = Vec2::splat(inner_radius * 0.8);
-
-    let tip_color = Color::srgb(0.9, 0.9, 0.9);
-    for pos in &tip_positions.tips {
-        let base_pos = layout.hex_to_world_pos(*pos);
-        let world_pos = Vec3::new(base_pos.x, base_pos.y, 2.0);
-
-        commands.spawn((
-            TipSprite,
-            Sprite {
-                color: tip_color,
-                custom_size: Some(tip_size),
-                ..default()
-            },
-            Transform::from_translation(world_pos),
-        ));
-    }
 }
 
 // One `Added<T>` query per organism so each component picks its own sprite/colour.

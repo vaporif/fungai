@@ -2,20 +2,28 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use hexx::Hex;
-use kingdom_core::{GridPos, GridWorld, RegionId, RegionStates, Tile};
+use kingdom_core::{CLAIM_THRESHOLD, GridPos, GridWorld, RegionId, RegionStates, Tile};
 
 pub fn region_tracking_system(
     mut tiles: Query<(&GridPos, &mut Tile)>,
     grid: Res<GridWorld>,
     mut region_states: ResMut<RegionStates>,
 ) {
+    // THRESHOLD-GATED: a tile is "owned" only when its biomass has actually
+    // reached CLAIM_THRESHOLD. Sub-threshold region_id tags (e.g. fresh density
+    // flow that hasn't accumulated yet) do not contribute to region tracking.
     let player_tiles: HashMap<Hex, RegionId> = tiles
         .iter()
-        .filter_map(|(gpos, tile)| tile.region_id.map(|rid| (gpos.0, rid)))
+        .filter_map(|(gpos, tile)| {
+            tile.region_id
+                .filter(|_| tile.biomass >= CLAIM_THRESHOLD)
+                .map(|rid| (gpos.0, rid))
+        })
         .collect();
 
     for state in region_states.regions.values_mut() {
         state.tile_count = 0;
+        state.total_biomass = 0.0;
     }
 
     let components = connected_components(&player_tiles, &grid);
@@ -99,12 +107,16 @@ mod tests {
     }
 
     fn spawn_tile(app: &mut App, pos: Hex, region_id: Option<RegionId>) -> Entity {
+        // For tracking tests, owned tiles need biomass >= CLAIM_THRESHOLD to
+        // satisfy the THRESHOLD-GATED ownership semantics.
+        let biomass = if region_id.is_some() { 0.5 } else { 0.0 };
         let entity = app
             .world_mut()
             .spawn((
                 GridPos(pos),
                 Tile {
                     region_id,
+                    biomass,
                     ..default()
                 },
             ))

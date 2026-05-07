@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use kingdom_core::{
-    CLAIM_THRESHOLD, GridPos, GridWorld, Hex, HyphalTip, MushroomEntity, RegionId, RegionStates,
+    CLAIM_THRESHOLD, GridPos, GridWorld, Hex, MushroomEntity, RegionId, RegionStates,
     SPORE_RELAY_ACCURACY_RADIUS, Tile,
 };
 use rand::prelude::*;
@@ -35,10 +35,9 @@ impl Default for SporeRng {
 
 pub fn spore_system(
     mushrooms: Query<&MushroomEntity>,
-    tiles: Query<(&GridPos, &Tile)>,
+    mut tiles: Query<(&GridPos, &mut Tile)>,
     grid: Res<GridWorld>,
     region_states: Res<RegionStates>,
-    mut commands: Commands,
     mut rng: ResMut<SporeRng>,
     mut spore_action: ResMut<SporeAction>,
 ) {
@@ -70,8 +69,16 @@ pub fn spore_system(
         return;
     }
 
-    if let Some(landing_pos) = pick_spore_landing(&grid, &tiles, mushroom.pos, &mut rng.0) {
-        commands.spawn((GridPos(landing_pos), HyphalTip { region_id, age: 0 }));
+    let landing_pos = pick_spore_landing(&tiles, mushroom.pos, &mut rng.0);
+
+    if let Some(landing_pos) = landing_pos
+        && let Some(&entity) = grid.tiles.get(&landing_pos)
+        && let Ok((_, mut tile)) = tiles.get_mut(entity)
+    {
+        // Seed the landing tile so density flow can pick up from here:
+        // claim it for the region by setting biomass above CLAIM_THRESHOLD.
+        tile.region_id = Some(region_id);
+        tile.biomass = tile.biomass.max(CLAIM_THRESHOLD + 0.2);
     }
 
     spore_action.triggered = false;
@@ -80,7 +87,7 @@ pub fn spore_system(
 
 // THRESHOLD-GATED: only count a region as owning the area if its network has
 // actually arrived (biomass past CLAIM_THRESHOLD), not just a sub-threshold tag.
-fn find_owning_region(tiles: &Query<(&GridPos, &Tile)>, pos: Hex) -> Option<RegionId> {
+fn find_owning_region(tiles: &Query<(&GridPos, &mut Tile)>, pos: Hex) -> Option<RegionId> {
     for (gpos, tile) in tiles.iter() {
         let dist = gpos.0.unsigned_distance_to(pos);
         if dist <= 3
@@ -94,8 +101,7 @@ fn find_owning_region(tiles: &Query<(&GridPos, &Tile)>, pos: Hex) -> Option<Regi
 }
 
 fn pick_spore_landing(
-    _grid: &GridWorld,
-    tiles: &Query<(&GridPos, &Tile)>,
+    tiles: &Query<(&GridPos, &mut Tile)>,
     origin: Hex,
     rng: &mut StdRng,
 ) -> Option<Hex> {
@@ -146,8 +152,25 @@ mod tests {
         }
     }
 
+    fn count_newly_claimed(app: &mut App, center: Hex, rid: RegionId) -> u32 {
+        let mut count = 0;
+        for (gpos, tile) in app
+            .world_mut()
+            .query::<(&GridPos, &Tile)>()
+            .iter(app.world())
+        {
+            if gpos.0 != center
+                && tile.region_id == Some(rid)
+                && tile.biomass >= CLAIM_THRESHOLD + 0.1
+            {
+                count += 1;
+            }
+        }
+        count
+    }
+
     #[test]
-    fn spore_spawns_tip_near_mushroom() {
+    fn spore_seeds_tile_near_mushroom() {
         let mut app = test_app();
 
         let rid = app
@@ -191,24 +214,28 @@ mod tests {
         app.add_systems(Update, spore_system);
         app.update();
 
-        let tip_count = app
+        let claimed = count_newly_claimed(&mut app, center, rid);
+        assert_eq!(claimed, 1, "spore should claim exactly one tile");
+
+        let (claimed_pos, claimed_tile) = app
             .world_mut()
-            .query::<&HyphalTip>()
+            .query::<(&GridPos, &Tile)>()
             .iter(app.world())
-            .count();
-        assert_eq!(tip_count, 1, "spore should spawn exactly one hyphal tip");
+            .find(|(gpos, t)| {
+                gpos.0 != center && t.region_id == Some(rid) && t.biomass >= CLAIM_THRESHOLD + 0.1
+            })
+            .map(|(gp, t)| (gp.0, t.clone()))
+            .expect("should have exactly one newly-claimed tile");
+        assert_eq!(
+            claimed_tile.region_id,
+            Some(rid),
+            "claim should belong to mushroom's region"
+        );
 
-        let (tip_pos, tip) = app
-            .world_mut()
-            .query::<(&GridPos, &HyphalTip)>()
-            .single(app.world())
-            .expect("should have exactly one hyphal tip");
-        assert_eq!(tip.region_id, rid, "tip should belong to mushroom's region");
-
-        let dist = tip_pos.0.unsigned_distance_to(center);
+        let dist = claimed_pos.unsigned_distance_to(center);
         assert!(
             dist <= SPORE_RELAY_ACCURACY_RADIUS as u32,
-            "tip should land within spore accuracy radius"
+            "claim should land within spore accuracy radius"
         );
     }
 
@@ -258,14 +285,10 @@ mod tests {
         app.add_systems(Update, spore_system);
         app.update();
 
-        let tip_count = app
-            .world_mut()
-            .query::<&HyphalTip>()
-            .iter(app.world())
-            .count();
+        let claimed = count_newly_claimed(&mut app, center, rid);
         assert_eq!(
-            tip_count, 0,
-            "no tip should spawn when all nearby tiles are impassable"
+            claimed, 0,
+            "no tile should be claimed when all nearby tiles are impassable"
         );
     }
 
@@ -287,14 +310,20 @@ mod tests {
         app.add_systems(Update, spore_system);
         app.update();
 
-        let tip_count = app
+        // No region exists, so no tile should ever be claimed.
+        let mut any_claimed = false;
+        for (_gpos, tile) in app
             .world_mut()
-            .query::<&HyphalTip>()
+            .query::<(&GridPos, &Tile)>()
             .iter(app.world())
-            .count();
-        assert_eq!(
-            tip_count, 0,
-            "no tip should spawn when mushroom has no owning region"
+        {
+            if tile.region_id.is_some() && tile.biomass >= CLAIM_THRESHOLD {
+                any_claimed = true;
+            }
+        }
+        assert!(
+            !any_claimed,
+            "no tile should be claimed when mushroom has no owning region"
         );
     }
 
@@ -349,12 +378,8 @@ mod tests {
         app.add_systems(Update, spore_system);
         app.update();
 
-        let tip_count = app
-            .world_mut()
-            .query::<&HyphalTip>()
-            .iter(app.world())
-            .count();
-        assert_eq!(tip_count, 0, "spore should not fire without trigger");
+        let claimed = count_newly_claimed(&mut app, center, rid);
+        assert_eq!(claimed, 0, "spore should not fire without trigger");
     }
 
     #[test]
@@ -401,23 +426,15 @@ mod tests {
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
         app.update();
 
-        let tip_count = app
-            .world_mut()
-            .query::<&HyphalTip>()
-            .iter(app.world())
-            .count();
-        assert_eq!(tip_count, 1, "first trigger should spawn a tip");
+        let claimed = count_newly_claimed(&mut app, center, rid);
+        assert_eq!(claimed, 1, "first trigger should claim a tile");
 
         // Immediately trigger again -- should be blocked by cooldown
         app.world_mut().resource_mut::<SporeAction>().triggered = true;
         app.update();
 
-        let tip_count = app
-            .world_mut()
-            .query::<&HyphalTip>()
-            .iter(app.world())
-            .count();
-        assert_eq!(tip_count, 1, "second trigger should be blocked by cooldown");
+        let claimed = count_newly_claimed(&mut app, center, rid);
+        assert_eq!(claimed, 1, "second trigger should be blocked by cooldown");
 
         let action = app.world().resource::<SporeAction>();
         assert!(

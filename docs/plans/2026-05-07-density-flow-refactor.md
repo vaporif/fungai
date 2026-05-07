@@ -810,7 +810,7 @@ git commit -m "T2: drop Occupant, rename nutrient_level→soil_richness, migrate
 
 **Note on parallelism:** This task and T6 (UI simplification) run in parallel. T3 owns growth + world + render; T6 owns ui. Files do not overlap.
 
-- [ ] **Step 1: Verify baseline (T2 complete)**
+- [x] **Step 1: Verify baseline (T2 complete)**
 
 ```bash
 just lint && just test && git status
@@ -818,7 +818,7 @@ just lint && just test && git status
 
 Expected: clean.
 
-- [ ] **Step 2: Write the failing test for `bias_decay_system`**
+- [x] **Step 2: Write the failing test for `bias_decay_system`**
 
 Create `crates/growth/src/bias_decay.rs` with the test scaffold:
 
@@ -892,7 +892,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Wire `bias_decay` module and verify tests pass**
+- [x] **Step 3: Wire `bias_decay` module and verify tests pass**
 
 In `crates/growth/src/lib.rs`, add `mod bias_decay;` and `pub use bias_decay::bias_decay_system;`. Then:
 
@@ -902,7 +902,7 @@ cargo nextest run -p kingdom_growth bias_decay
 
 Expected: 2 tests pass.
 
-- [ ] **Step 4: Write `moisture_diffusion_system` with tests first**
+- [x] **Step 4: Write `moisture_diffusion_system` with tests first**
 
 Create `crates/growth/src/moisture.rs`:
 
@@ -1028,7 +1028,7 @@ cargo nextest run -p kingdom_growth moisture
 
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Write `density_flow_system` with tests first**
+- [x] **Step 5: Write `density_flow_system` with tests first**
 
 Create `crates/growth/src/density_flow.rs`. The system has the highest design density of any in the plan — write the tests first, then the implementation.
 
@@ -1357,7 +1357,7 @@ cargo nextest run -p kingdom_growth density_flow
 
 Expected: 4 tests pass. If `flow_follows_bias_direction` is flaky due to noise, lower the noise scale temporarily in the test by inserting a fixed-seed RNG and rerun.
 
-- [ ] **Step 6: Write `dieback_system` with tests first**
+- [x] **Step 6: Write `dieback_system` with tests first**
 
 Create `crates/growth/src/dieback.rs`:
 
@@ -1466,13 +1466,13 @@ cargo nextest run -p kingdom_growth dieback
 
 Expected: 3 tests pass.
 
-- [ ] **Step 7: Strip the old `nutrient.rs` down to just `nutrient_gradient_system`**
+- [x] **Step 7: Strip the old `nutrient.rs` down to just `nutrient_gradient_system`**
 
 Open `crates/growth/src/nutrient.rs`. Delete `nutrient_production_system` and `nutrient_transport_system` and their tests. Keep `nutrient_gradient_system` and its `gradient_points_toward_higher_nutrients` test (rename references inside from `nutrient_level` to `soil_richness` if T2 missed any).
 
 In `crates/growth/src/lib.rs`, drop `nutrient_production_system` and `nutrient_transport_system` from re-exports and from system registration. Keep `nutrient_gradient_system`.
 
-- [ ] **Step 8: Delete `tip.rs` and `decay.rs`**
+- [x] **Step 8: Delete `tip.rs` and `decay.rs`**
 
 ```bash
 rm crates/growth/src/tip.rs crates/growth/src/decay.rs
@@ -1488,11 +1488,11 @@ rg "ANASTOMOSIS_BIOMASS_BONUS" crates bin
 
 Expected: empty.
 
-- [ ] **Step 9: Delete `HyphalTip` from `crates/core/src/components.rs`**
+- [x] **Step 9: Delete `HyphalTip` from `crates/core/src/components.rs`**
 
 Open the file, remove the `HyphalTip` struct definition and its derives. Remove `HyphalTip` from any re-exports in `crates/core/src/lib.rs`. Run `cargo check` — anything that still references `HyphalTip` must be removed.
 
-- [ ] **Step 10: Wire the new growth plugin chain**
+- [x] **Step 10: Wire the new growth plugin chain**
 
 Replace the body of `GrowthPlugin::build` in `crates/growth/src/lib.rs`:
 
@@ -1533,7 +1533,7 @@ impl Plugin for GrowthPlugin {
 }
 ```
 
-- [ ] **Step 11: Update `crates/world/src/region_tracking.rs` for new ownership semantics**
+- [x] **Step 11: Update `crates/world/src/region_tracking.rs` for new ownership semantics**
 
 Open the file. The current implementation reads `Occupant::Player(rid)` to identify owned tiles. Replace that with: a tile is "claimed for region R" iff `tile.region_id == Some(R) && tile.biomass >= CLAIM_THRESHOLD`. Connected components by these criteria define regions.
 
@@ -1541,7 +1541,7 @@ Update tests in the same file similarly: setup tiles with `region_id: Some(rid),
 
 Also update `RegionState.total_biomass`: each tick, `region.total_biomass = sum(tile.biomass for owned tiles)` and `region.tile_count = count(owned tiles)`. This is the natural place for that aggregation.
 
-- [ ] **Step 12: Update `crates/render/src/data_layer.rs`**
+- [x] **Step 12: Update `crates/render/src/data_layer.rs`**
 
 Delete:
 - `TipPositions` resource
@@ -1552,17 +1552,17 @@ Update `extract_branch_graph`:
 - Builds edges between any two adjacent tiles where both `region_id.is_some()` and both `biomass >= CLAIM_THRESHOLD`.
 - Edge weight (if present) reflects average biomass — feeds the existing strand-thickness shader unchanged.
 
-- [ ] **Step 13: Update `crates/render/src/lib.rs`**
+- [x] **Step 13: Update `crates/render/src/lib.rs`**
 
 Drop:
 - `init_resource::<TipPositions>()`
 - `data_layer::extract_tip_positions` from system tuple
 
-- [ ] **Step 14: Update `crates/render/src/entity_render.rs`**
+- [x] **Step 14: Update `crates/render/src/entity_render.rs`**
 
 Delete `tip_render_system` and any associated marker components or sprite-link handling that exists only to render tips. Drop its registration from the `PostUpdate` schedule in `RenderPlugin::build`.
 
-- [ ] **Step 15: Verify compilation**
+- [x] **Step 15: Verify compilation**
 
 ```bash
 cargo check --workspace --all-features --all-targets
@@ -1570,7 +1570,7 @@ cargo check --workspace --all-features --all-targets
 
 Expected: clean.
 
-- [ ] **Step 16: Run growth tests**
+- [x] **Step 16: Run growth tests**
 
 ```bash
 cargo nextest run -p kingdom_growth
@@ -1578,7 +1578,7 @@ cargo nextest run -p kingdom_growth
 
 Expected: all bias_decay, moisture, density_flow, dieback, nutrient_gradient tests pass. Total roughly 13 tests.
 
-- [ ] **Step 17: Run world tests**
+- [x] **Step 17: Run world tests**
 
 ```bash
 cargo nextest run -p kingdom_world
@@ -1586,7 +1586,7 @@ cargo nextest run -p kingdom_world
 
 Expected: pass after region_tracking adjustments.
 
-- [ ] **Step 18: Run full suite**
+- [x] **Step 18: Run full suite**
 
 ```bash
 just test
@@ -1594,7 +1594,7 @@ just test
 
 Expected: pass. If region tracking tests fail because they depended on `Occupant`, fix them per Step 11.
 
-- [ ] **Step 19: Smoke test**
+- [x] **Step 19: Smoke test**
 
 ```bash
 just dev
@@ -1602,13 +1602,13 @@ just dev
 
 Expected: game launches; mycelium spreads from spawn via density flow (no longer via tip hops); paint with P-key (T5 will replace this) still pulls bias. No crashes.
 
-- [ ] **Step 20: Run lints**
+- [x] **Step 20: Run lints**
 
 ```bash
 just lint
 ```
 
-- [ ] **Step 21: Commit T3**
+- [x] **Step 21: Commit T3**
 
 ```bash
 git add -A

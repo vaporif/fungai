@@ -11,7 +11,7 @@ mod entity_render;
 mod network_render;
 mod terrain_render;
 
-pub use data_layer::{BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls, TipPositions};
+pub use data_layer::{BranchGraph, DiscoveryMap, PriorityBiasMap, RegionHulls};
 pub use network_render::catmull_rom;
 pub use terrain_render::{terrain_base_color, terrain_type_index};
 
@@ -25,7 +25,6 @@ impl Plugin for RenderPlugin {
             .init_resource::<assets::EntitySprites>()
             .init_resource::<terrain_render::PendingAtlasCheck>()
             .init_resource::<BranchGraph>()
-            .init_resource::<TipPositions>()
             .init_resource::<RegionHulls>()
             .init_resource::<data_layer::DiscoveryMap>()
             .init_resource::<data_layer::PriorityBiasMap>()
@@ -34,7 +33,6 @@ impl Plugin for RenderPlugin {
                 Update,
                 (
                     data_layer::extract_branch_graph,
-                    data_layer::extract_tip_positions,
                     data_layer::extract_region_hulls,
                     data_layer::extract_discovery_map.after(data_layer::extract_branch_graph),
                 )
@@ -62,7 +60,6 @@ impl Plugin for RenderPlugin {
                 (
                     terrain_render::terrain_tile_update_system,
                     network_render::network_render_system,
-                    entity_render::tip_render_system,
                     (
                         entity_render::despawn_orphaned_organism_sprites,
                         entity_render::spawn_organism_sprites,
