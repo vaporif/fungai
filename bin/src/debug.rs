@@ -49,11 +49,11 @@ fn log_diagnostics(world: &mut World, mut last_log: Local<f32>) {
         .get(&SystemInformationDiagnosticsPlugin::PROCESS_MEM_USAGE)
         .and_then(|d| d.smoothed())
         .unwrap_or(0.0);
-    let mem_mb = mem_gib * 1024.0;
+    let mem_mib = mem_gib * 1024.0;
 
     info!(
         "diag fps={fps:.1} frame_ms={frame_time_ms:.2} entities={entity_count:.0} \
-         cpu={cpu_pct:.1}% mem={mem_mb:.0}MB elapsed={now:.0}s"
+         cpu={cpu_pct:.1}% mem={mem_mib:.0}MiB elapsed={now:.0}s"
     );
 
     let components = world.components();
