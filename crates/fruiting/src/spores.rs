@@ -293,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn spore_skips_mukingdom_without_owning_region() {
+    fn spore_skips_mushroom_without_owning_region() {
         let mut app = test_app();
 
         let center = Hex::new(5, 5);

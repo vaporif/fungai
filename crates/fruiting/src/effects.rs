@@ -4,7 +4,7 @@ use kingdom_core::{
     RegionStates, Tile,
 };
 
-pub fn mukingdom_effect_system(
+pub fn mushroom_effect_system(
     mushrooms: Query<&MushroomEntity>,
     mut tiles: Query<(&GridPos, &mut Tile)>,
     mut region_states: ResMut<RegionStates>,
@@ -54,10 +54,10 @@ mod tests {
     }
 
     #[test]
-    fn mukingdom_boosts_moisture_within_radius() {
+    fn mushroom_boosts_moisture_within_radius() {
         let mut app = test_app();
 
-        let mukingdom_pos = Hex::new(5, 5);
+        let mushroom_pos = Hex::new(5, 5);
         // Hex distance 2 -- well within MUSHROOM_MOISTURE_RADIUS (5)
         let near_pos = Hex::new(5, 3);
         // Hex distance 30 -- far outside
@@ -82,11 +82,11 @@ mod tests {
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: mukingdom_pos,
+            pos: mushroom_pos,
             vision_radius: 10.0,
         });
 
-        app.add_systems(Update, mukingdom_effect_system);
+        app.add_systems(Update, mushroom_effect_system);
         app.update();
 
         let near_tile = app.world().get::<Tile>(near_entity).expect("near tile");
@@ -105,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    fn mukingdom_grants_nutrient_bonus_to_nearby_player_region() {
+    fn mushroom_grants_nutrient_bonus_to_nearby_player_region() {
         let mut app = test_app();
 
         let rid = app
@@ -119,9 +119,9 @@ mod tests {
             .expect("region")
             .sugars;
 
-        let mukingdom_pos = Hex::new(5, 5);
+        let mushroom_pos = Hex::new(5, 5);
         // Place a player tile at a hex neighbor (distance 1, within bonus radius of 3)
-        let neighbor = mukingdom_pos.all_neighbors()[0];
+        let neighbor = mushroom_pos.all_neighbors()[0];
         spawn_tile_at(
             &mut app,
             neighbor,
@@ -134,11 +134,11 @@ mod tests {
 
         app.world_mut().spawn(MushroomEntity {
             fragment_id: FragmentId(0),
-            pos: mukingdom_pos,
+            pos: mushroom_pos,
             vision_radius: 10.0,
         });
 
-        app.add_systems(Update, mukingdom_effect_system);
+        app.add_systems(Update, mushroom_effect_system);
         app.update();
 
         let sugars = app
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn mukingdom_moisture_caps_at_one() {
+    fn mushroom_moisture_caps_at_one() {
         let mut app = test_app();
 
         let pos = Hex::new(5, 5);
@@ -173,7 +173,7 @@ mod tests {
             vision_radius: 10.0,
         });
 
-        app.add_systems(Update, mukingdom_effect_system);
+        app.add_systems(Update, mushroom_effect_system);
         app.update();
 
         let tile = app.world().get::<Tile>(entity).expect("tile");
@@ -188,7 +188,7 @@ mod tests {
     fn no_crash_with_no_mushrooms() {
         let mut app = test_app();
         spawn_tile_at(&mut app, Hex::ZERO, Tile::default());
-        app.add_systems(Update, mukingdom_effect_system);
+        app.add_systems(Update, mushroom_effect_system);
         app.update();
     }
 }

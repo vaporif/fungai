@@ -110,23 +110,23 @@ fn unlock_pool_options(pool: UnlockPool) -> Vec<UnlockOption> {
         ],
         UnlockPool::Decomposition => vec![
             UnlockOption {
-                name: "Enzyme Burst+".into(),
-                description: "Enzyme burst radius doubled".into(),
+                name: "Rich Bloom".into(),
+                description: "Decomposition leaves richer soil behind".into(),
                 pool,
             },
             UnlockOption {
-                name: "Toxin Resistance".into(),
-                description: "Tips survive in Toxic terrain".into(),
+                name: "Sweet Trade".into(),
+                description: "Symbiosis with plants yields more sugars".into(),
                 pool,
             },
             UnlockOption {
-                name: "Nutrient Conversion".into(),
-                description: "Convert energy to nutrients at 2:1".into(),
+                name: "Eager Flow".into(),
+                description: "Mycelium pushes a little harder past the frontier".into(),
                 pool,
             },
             UnlockOption {
-                name: "Acid Secretion".into(),
-                description: "Dissolve Rock tiles adjacent to decomposer regions".into(),
+                name: "Hardened Hyphae".into(),
+                description: "Dry tiles cling to the network for longer before dying back".into(),
                 pool,
             },
         ],

@@ -127,13 +127,13 @@ mod tests {
         app.add_systems(Update, fruiting_system);
         app.update();
 
-        let mukingdom_count = app
+        let mushroom_count = app
             .world_mut()
             .query::<&MushroomEntity>()
             .iter(app.world())
             .count();
         assert_eq!(
-            mukingdom_count, 1,
+            mushroom_count, 1,
             "completed fruiting should spawn mushroom"
         );
     }
