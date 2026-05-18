@@ -1898,7 +1898,7 @@ A selected, idle founder standing on a valid site founds a new network: the foun
 - Modify: `crates/render/src/units_render.rs`, `crates/render/src/lib.rs`
 - Modify: `crates/ui/src/hud.rs`
 
-- [ ] **Step 1: Add the `NetworkFounded` message**
+- [x] **Step 1: Add the `NetworkFounded` message**
 
 Append to `crates/core/src/messages.rs`:
 
@@ -1912,7 +1912,7 @@ pub struct NetworkFounded {
 
 (`RegionId` is imported in Task 2 Step 2; `Hex` is already imported.)
 
-- [ ] **Step 2: Add the founding constants**
+- [x] **Step 2: Add the founding constants**
 
 Append to `crates/core/src/constants.rs`:
 
@@ -1923,7 +1923,7 @@ pub const FOUNDER_SEED_BIOMASS: f32 = 1.0;
 pub const FOUNDER_SEED_SUGARS: f32 = 10.0;
 ```
 
-- [ ] **Step 3: Note the valid-site predicate shape**
+- [x] **Step 3: Note the valid-site predicate shape**
 
 The valid-site predicate is implemented in Step 5; its test module is written in Step 6, against the real signature. The predicate takes a `hex`, the `GridWorld`, a tile query, and decides three things:
 
@@ -1933,11 +1933,11 @@ The valid-site predicate is implemented in Step 5; its test module is written in
 
 Do Step 5 first, then write the Step 6 tests against the finalised signature.
 
-- [ ] **Step 4: Add the founding seed constant usage note**
+- [x] **Step 4: Add the founding seed constant usage note**
 
 No code in this step — confirm `CLAIM_THRESHOLD` is `0.3` (`crates/core/src/constants.rs:8`) so `FOUNDER_SEED_BIOMASS = 1.0` is comfortably above it and the founded tile counts as owned on the next `region_tracking_system` run.
 
-- [ ] **Step 5: Implement the valid-site predicate and `founding_system`**
+- [x] **Step 5: Implement the valid-site predicate and `founding_system`**
 
 `founding_system` reacts to a request flag, not the `FoundNetwork` action: `kingdom_core` does not export `Action`, the action lives in `kingdom_input`, and `kingdom_input` already depends on `kingdom_units` for `find_path` — having `founding_system` read the action would create a `units → input` dependency cycle. A one-frame request resource, written by `kingdom_input` and the HUD button and consumed here, breaks the cycle.
 
@@ -2036,7 +2036,7 @@ pub fn founding_system(
 
 `is_valid_site` takes `&Query<&mut Tile>` rather than `&Query<&Tile>` so the one `Query<&mut Tile>` param of `founding_system` can be borrowed for both the read-only check and the later mutation — Bevy rejects two conflicting `Tile` queries in one system, and `.get(e)` on a `&mut` query yields a shared `&Tile`.
 
-- [ ] **Step 6: Write the failing tests for `is_valid_site`**
+- [x] **Step 6: Write the failing tests for `is_valid_site`**
 
 Create the `crates/units/src/founding.rs` test module against the finalised `is_valid_site(hex, grid, tiles: &Query<&mut Tile>)` signature:
 
@@ -2104,12 +2104,12 @@ mod tests {
 
 `is_valid_site`'s signature is therefore `pub fn is_valid_site(hex: Hex, grid: &GridWorld, tiles: &Query<&mut Tile>) -> bool`.
 
-- [ ] **Step 7: Run the founding tests to verify they pass**
+- [x] **Step 7: Run the founding tests to verify they pass**
 
 Run: `cargo nextest run -p kingdom_units founding`
 Expected: PASS — all three site-predicate tests green.
 
-- [ ] **Step 8: Register founding in the plugin**
+- [x] **Step 8: Register founding in the plugin**
 
 In `crates/units/src/lib.rs`: add `mod founding;`, re-export `pub use founding::{founding_system, is_valid_site};`, init the request resource, and register the system ungated:
 
@@ -2119,7 +2119,7 @@ In `crates/units/src/lib.rs`: add `mod founding;`, re-export `pub use founding::
             .add_systems(Update, founding_system);
 ```
 
-- [ ] **Step 9: Wire the `FoundNetwork` action to the request flag**
+- [x] **Step 9: Wire the `FoundNetwork` action to the request flag**
 
 In `crates/input/src/pointer.rs` (or a tiny dedicated system), set the request flag when the `FoundNetwork` action fires. Add a system to `crates/input/src/pointer.rs`:
 

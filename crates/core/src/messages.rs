@@ -29,3 +29,9 @@ pub struct HiveCaptured {
     pub hive_pos: Hex,
     pub region_id: RegionId,
 }
+
+#[derive(Message)]
+pub struct NetworkFounded {
+    pub region_id: RegionId,
+    pub seed: Hex,
+}

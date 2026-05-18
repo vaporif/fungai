@@ -96,3 +96,7 @@ pub struct UnitMovement {
 
 #[derive(Resource, Default)]
 pub struct SelectedUnit(pub Option<Entity>);
+
+/// Set for one frame to request that the selected founder found a network.
+#[derive(Resource, Default)]
+pub struct FoundNetworkRequest(pub bool);

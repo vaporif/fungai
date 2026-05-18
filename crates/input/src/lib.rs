@@ -13,7 +13,7 @@ pub use action::{Action, default_input_map};
 pub use camera::{GameCamera, camera_system, spawn_camera};
 pub use cursor::cursor_system;
 pub use kingdom_core::{SelectedRegion, SelectedUnit};
-pub use pointer::pointer_system;
+pub use pointer::{found_network_input_system, pointer_system};
 pub use selection::selection_system;
 pub use speed::speed_input_system;
 pub use wisp::{TileTapped, WispPhase, WispState, wisp_input_system};
@@ -35,6 +35,7 @@ impl Plugin for InputPlugin {
                     camera_system,
                     wisp_input_system,
                     pointer_system,
+                    found_network_input_system,
                     cursor_system,
                     selection_system,
                     speed_input_system,

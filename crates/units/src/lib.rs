@@ -2,11 +2,13 @@ use bevy::prelude::*;
 use kingdom_core::{HiveCaptured, SimulationSystems};
 use kingdom_world::region_tracking_system;
 
+mod founding;
 mod hive;
 mod movement;
 mod pathfinding;
 mod production;
 
+pub use founding::{founding_system, is_valid_site};
 pub use hive::hive_capture_system;
 pub use movement::unit_movement_system;
 pub use pathfinding::find_path;
@@ -35,5 +37,9 @@ impl Plugin for UnitsPlugin {
             // `pointer_system` (which writes the path) is harmless — the unit
             // simply starts moving on the next frame.
             .add_systems(Update, unit_movement_system);
+
+        app.init_resource::<kingdom_core::FoundNetworkRequest>()
+            .add_message::<kingdom_core::NetworkFounded>()
+            .add_systems(Update, founding_system);
     }
 }

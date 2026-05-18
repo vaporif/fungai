@@ -100,6 +100,15 @@ pub fn pointer_system(
     taps.write(TileTapped { pos: hex });
 }
 
+pub fn found_network_input_system(
+    actions: Res<ActionState<Action>>,
+    mut request: ResMut<kingdom_core::FoundNetworkRequest>,
+) {
+    if actions.just_pressed(&Action::FoundNetwork) {
+        request.0 = true;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -51,3 +51,8 @@ pub const UNIT_CAP_BASE: u32 = 2;
 pub const UNIT_CAP_PER_HIVE: u32 = 2;
 
 pub const UNIT_SPEED_HEXES_PER_SEC: f32 = 1.0;
+
+/// Minimum hex distance from any owned tile to a valid founding site.
+pub const MIN_FOUNDING_DISTANCE: u32 = 6;
+pub const FOUNDER_SEED_BIOMASS: f32 = 1.0;
+pub const FOUNDER_SEED_SUGARS: f32 = 10.0;
