@@ -49,3 +49,5 @@ pub const HIVE_PRODUCTION_RATE: f32 = 0.05;
 pub const UNIT_UPKEEP_SUGAR: f32 = 0.1;
 pub const UNIT_CAP_BASE: u32 = 2;
 pub const UNIT_CAP_PER_HIVE: u32 = 2;
+
+pub const UNIT_SPEED_HEXES_PER_SEC: f32 = 1.0;

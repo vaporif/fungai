@@ -1320,7 +1320,7 @@ Units move in real time along an A* hex path. The bare left click selects units 
 - Create: `crates/input/src/pointer.rs`, `crates/input/src/cursor.rs`
 - Modify: `crates/render/src/units_render.rs`, `crates/render/src/lib.rs`
 
-- [ ] **Step 1: Add the `SelectedUnit` resource**
+- [x] **Step 1: Add the `SelectedUnit` resource**
 
 Append to `crates/core/src/components.rs`:
 
@@ -1329,7 +1329,7 @@ Append to `crates/core/src/components.rs`:
 pub struct SelectedUnit(pub Option<Entity>);
 ```
 
-- [ ] **Step 2: Write the failing test for A* pathfinding**
+- [x] **Step 2: Write the failing test for A* pathfinding**
 
 Create `crates/units/src/pathfinding.rs` with the test module first:
 
@@ -1378,12 +1378,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `cargo nextest run -p kingdom_units pathfinding`
 Expected: FAIL — `find_path` undefined.
 
-- [ ] **Step 4: Implement A* pathfinding via the `pathfinding` crate**
+- [x] **Step 4: Implement A* pathfinding via the `pathfinding` crate**
 
 `find_path` is a thin adapter over `pathfinding::prelude::astar` — no
 hand-rolled binary heap. The successor function is `grid.neighbors`
@@ -1429,12 +1429,12 @@ pub fn find_path(
 }
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `cargo nextest run -p kingdom_units pathfinding`
 Expected: PASS — straight path found, unreachable returns `None`.
 
-- [ ] **Step 6: Write the failing test for `unit_movement_system`**
+- [x] **Step 6: Write the failing test for `unit_movement_system`**
 
 Create `crates/units/src/movement.rs` with the test module first:
 
@@ -1493,12 +1493,12 @@ mod tests {
 
 The wall-clock `sleep` keeps the test robust against Bevy's first-frame zero delta; it is slow but reliable. If the CI budget forbids sleeps, the implementer may instead advance `Time` manually — but the sleep form is the default.
 
-- [ ] **Step 7: Run the test to verify it fails**
+- [x] **Step 7: Run the test to verify it fails**
 
 Run: `cargo nextest run -p kingdom_units movement`
 Expected: FAIL — `unit_movement_system` undefined.
 
-- [ ] **Step 8: Add the movement speed constant**
+- [x] **Step 8: Add the movement speed constant**
 
 Append to `crates/core/src/constants.rs`:
 
@@ -1506,7 +1506,7 @@ Append to `crates/core/src/constants.rs`:
 pub const UNIT_SPEED_HEXES_PER_SEC: f32 = 1.0;
 ```
 
-- [ ] **Step 9: Implement `unit_movement_system`**
+- [x] **Step 9: Implement `unit_movement_system`**
 
 Prepend to `crates/units/src/movement.rs`:
 
@@ -1544,12 +1544,12 @@ pub fn unit_movement_system(
 }
 ```
 
-- [ ] **Step 10: Run the test to verify it passes**
+- [x] **Step 10: Run the test to verify it passes**
 
 Run: `cargo nextest run -p kingdom_units movement`
 Expected: PASS — the unit advances at Normal speed and stays put while Paused.
 
-- [ ] **Step 11: Register movement in the plugin**
+- [x] **Step 11: Register movement in the plugin**
 
 `unit_movement_system` runs every frame, ungated. In `crates/units/src/lib.rs`, add `mod movement;` and `mod pathfinding;`, re-export `pub use movement::unit_movement_system;` and `pub use pathfinding::find_path;`, init the `SelectedUnit` resource, and register:
 

@@ -93,3 +93,6 @@ pub struct UnitMovement {
     /// 0.0..1.0 progress along the edge from `GridPos` to `path[0]`.
     pub edge_progress: f32,
 }
+
+#[derive(Resource, Default)]
+pub struct SelectedUnit(pub Option<Entity>);
