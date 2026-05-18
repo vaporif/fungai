@@ -1,6 +1,7 @@
 use bevy::ecs::message::Message;
 
 use crate::grid::Hex;
+use crate::region::RegionId;
 use crate::tile::{FragmentId, TileContents};
 
 #[derive(Message)]
@@ -21,4 +22,10 @@ pub struct DecompositionComplete {
 #[derive(Message)]
 pub struct FragmentFused {
     pub fragment_id: FragmentId,
+}
+
+#[derive(Message)]
+pub struct HiveCaptured {
+    pub hive_pos: Hex,
+    pub region_id: RegionId,
 }

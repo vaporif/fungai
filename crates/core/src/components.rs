@@ -58,6 +58,14 @@ pub struct MushroomEntity {
 #[derive(Component, Debug)]
 pub struct OrganismSpriteLink(pub Entity);
 
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct Hive {
+    /// `None` = neutral; `Some` = the owning network.
+    pub captured_by: Option<RegionId>,
+    /// 0.0..=1.0 progress toward the next founder.
+    pub production: f32,
+}
+
 #[derive(Resource, Default)]
 pub struct SelectedRegion {
     pub region_id: Option<RegionId>,

@@ -441,7 +441,7 @@ Add the `Hive` component, place hives at world gen, create the `kingdom_units` c
 - Modify: `crates/render/src/lib.rs`, `crates/render/src/assets.rs`
 - Modify: `crates/ui/src/tile_popover.rs`
 
-- [ ] **Step 1: Add the `Hive` component**
+- [x] **Step 1: Add the `Hive` component**
 
 Append to `crates/core/src/components.rs`:
 
@@ -455,7 +455,7 @@ pub struct Hive {
 }
 ```
 
-- [ ] **Step 2: Add the `HiveCaptured` message**
+- [x] **Step 2: Add the `HiveCaptured` message**
 
 Append to `crates/core/src/messages.rs`:
 
@@ -471,7 +471,7 @@ pub struct HiveCaptured {
 
 (`Hex` is already imported at `crates/core/src/messages.rs:3`.)
 
-- [ ] **Step 3: Add the `HIVE_COUNT` constant**
+- [x] **Step 3: Add the `HIVE_COUNT` constant**
 
 Append to `crates/core/src/constants.rs`:
 
@@ -479,12 +479,12 @@ Append to `crates/core/src/constants.rs`:
 pub const HIVE_COUNT: u32 = 6;
 ```
 
-- [ ] **Step 4: Run a build check**
+- [x] **Step 4: Run a build check**
 
 Run: `cargo build -p kingdom_core`
 Expected: PASS — new types compile.
 
-- [ ] **Step 5: Place hives in `terrain_gen`**
+- [x] **Step 5: Place hives in `terrain_gen`**
 
 In `crates/world/src/terrain_gen.rs`, add hives to `Placements` and place them on the soil pool clear of the player start. Add a field to `Placements` (line 37):
 
@@ -536,7 +536,7 @@ Add `Hive` to the `kingdom_core` import list. Hives placed on the shuffled soil 
 
 Place this block right after `let mut placements = place_features(...)` and the `player_start` line. Drop the `place_features` hive loop — keep only the `Placements.hives` field and the `spawn_agents` loop.
 
-- [ ] **Step 6: Write the failing test for hive placement**
+- [x] **Step 6: Write the failing test for hive placement**
 
 Add to the `tests` module in `crates/world/src/terrain_gen.rs`:
 
@@ -561,12 +561,12 @@ fn places_hives_clear_of_player_start() {
 
 `GridPos` and `HIVE_COUNT` are already in scope via `use kingdom_core::{...}` / `super::*` — add `HIVE_COUNT` to the test imports if needed.
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `cargo nextest run -p kingdom_world places_hives`
 Expected: PASS — hives spawn and none sit within 6 hexes of the start.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Run: `git add -A && git commit -m "core+world: Hive component and world-gen placement"`
 

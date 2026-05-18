@@ -41,3 +41,5 @@ pub const SAMPLE_HEX_DISTANCE: f32 = 0.5;
 pub const WISP_SENSE_RADIUS_HEX: u32 = 5;
 
 pub const BIAS_GLOW_VISIBLE_THRESHOLD: f32 = 0.05;
+
+pub const HIVE_COUNT: u32 = 6;
