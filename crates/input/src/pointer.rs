@@ -3,7 +3,8 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use kingdom_core::{
-    GamePhase, GridPos, GridWorld, Hex, HexLayout, SelectedUnit, Tile, Unit, UnitMovement,
+    FoundNetworkRequest, GamePhase, GridPos, GridWorld, Hex, HexLayout, SelectedUnit, Tile, Unit,
+    UnitMovement,
 };
 use kingdom_units::find_path;
 use leafwing_input_manager::prelude::*;
@@ -102,7 +103,7 @@ pub fn pointer_system(
 
 pub fn found_network_input_system(
     actions: Res<ActionState<Action>>,
-    mut request: ResMut<kingdom_core::FoundNetworkRequest>,
+    mut request: ResMut<FoundNetworkRequest>,
 ) {
     if actions.just_pressed(&Action::FoundNetwork) {
         request.0 = true;

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use kingdom_core::{HiveCaptured, SimulationSystems};
+use kingdom_core::{
+    FoundNetworkRequest, HiveCaptured, NetworkFounded, SelectedUnit, SimulationSystems,
+};
 use kingdom_world::region_tracking_system;
 
 mod founding;
@@ -19,7 +21,7 @@ pub struct UnitsPlugin;
 impl Plugin for UnitsPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<HiveCaptured>()
-            .init_resource::<kingdom_core::SelectedUnit>()
+            .init_resource::<SelectedUnit>()
             .add_systems(
                 Update,
                 (
@@ -38,8 +40,8 @@ impl Plugin for UnitsPlugin {
             // simply starts moving on the next frame.
             .add_systems(Update, unit_movement_system);
 
-        app.init_resource::<kingdom_core::FoundNetworkRequest>()
-            .add_message::<kingdom_core::NetworkFounded>()
+        app.init_resource::<FoundNetworkRequest>()
+            .add_message::<NetworkFounded>()
             // Runs every frame, ungated by `SimulationSystems`. The request
             // flag is consumed once per frame: a press with no valid founder
             // selected is simply dropped, and 1-frame ordering jitter against

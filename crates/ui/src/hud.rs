@@ -1,6 +1,10 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use kingdom_core::{GameState, GridPos, LaunchConfig, RegionStates, SimulationSpeed};
+use kingdom_core::{
+    FoundNetworkRequest, GameState, GridPos, GridWorld, Hive, LaunchConfig, RegionStates,
+    SelectedUnit, SimulationSpeed, Tile, UNIT_CAP_BASE, UNIT_CAP_PER_HIVE, Unit, UnitKind,
+    UnitMovement,
+};
 use kingdom_input::SelectedRegion;
 
 #[derive(Resource, Debug, Reflect)]
@@ -189,8 +193,8 @@ pub struct HudInputs<'w, 's> {
     keyboard: Res<'w, ButtonInput<KeyCode>>,
     config: Res<'w, LaunchConfig>,
     hints_visible: ResMut<'w, HintsVisible>,
-    units: Query<'w, 's, &'static kingdom_core::Unit>,
-    hives: Query<'w, 's, &'static kingdom_core::Hive>,
+    units: Query<'w, 's, &'static Unit>,
+    hives: Query<'w, 's, &'static Hive>,
 }
 
 pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
@@ -210,7 +214,7 @@ pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
     let total_melanin: f32 = region_states.regions.values().map(|r| r.melanin).sum();
     let unit_count = units.iter().count();
     let captured_hives = hives.iter().filter(|h| h.captured_by.is_some()).count() as u32;
-    let cap = kingdom_core::UNIT_CAP_BASE + captured_hives * kingdom_core::UNIT_CAP_PER_HIVE;
+    let cap = UNIT_CAP_BASE + captured_hives * UNIT_CAP_PER_HIVE;
 
     if let Ok(mut text) = texts.turn.single_mut() {
         **text = format!(
@@ -270,18 +274,18 @@ pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
 }
 
 pub fn update_unit_panel(
-    selected: Res<kingdom_core::SelectedUnit>,
-    units: Query<(&kingdom_core::Unit, &GridPos, &kingdom_core::UnitMovement)>,
-    grid: Res<kingdom_core::GridWorld>,
-    tiles: Query<&mut kingdom_core::Tile>,
+    selected: Res<SelectedUnit>,
+    units: Query<(&Unit, &GridPos, &UnitMovement)>,
+    grid: Res<GridWorld>,
+    tiles: Query<&mut Tile>,
     mut panel: Query<&mut Visibility, With<UnitPanel>>,
     interaction: Query<&Interaction, (Changed<Interaction>, With<FoundNetworkButton>)>,
-    mut request: ResMut<kingdom_core::FoundNetworkRequest>,
+    mut request: ResMut<FoundNetworkRequest>,
 ) {
     let founder = selected
         .0
         .and_then(|e| units.get(e).ok())
-        .filter(|(u, _, m)| u.kind == kingdom_core::UnitKind::Founder && m.path.is_empty());
+        .filter(|(u, _, m)| u.kind == UnitKind::Founder && m.path.is_empty());
 
     let desired = if founder.is_some() {
         Visibility::Inherited

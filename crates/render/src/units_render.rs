@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy::prelude::*;
 use kingdom_core::{GridPos, HexLayout, Hive, SelectedUnit, Unit, UnitMovement};
 
@@ -104,7 +106,7 @@ pub fn despawn_unit_sprites(
     mut removed: RemovedComponents<Unit>,
     sprites: Query<(Entity, &UnitSprite)>,
 ) {
-    let gone: std::collections::HashSet<Entity> = removed.read().collect();
+    let gone: HashSet<Entity> = removed.read().collect();
     if gone.is_empty() {
         return;
     }

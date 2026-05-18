@@ -40,19 +40,27 @@ pub fn region_tracking_system(
             .expect("component is never empty")
     });
 
-    // An id is "absorbed" if it appears as a non-minimum member of any
+    // The candidate is the lowest member id — the oldest network in the
+    // component, and the merge survivor unless a split steals the id elsewhere.
+    let candidates: Vec<RegionId> = components
+        .iter()
+        .map(|(member_ids, _)| {
+            member_ids
+                .iter()
+                .copied()
+                .min()
+                .expect("a component always carries at least one member id")
+        })
+        .collect();
+
+    // An id is "absorbed" if it appears as a non-candidate member of any
     // component — a merge swallows it there, so it must not survive anywhere.
     // Every other piece still carrying that id becomes a fresh region instead
     // of keeping it. Computing this set up front (rather than deciding per
     // component) is what makes a simultaneous merge-and-split of the same
     // region deterministic instead of corrupting its id.
     let mut absorbed: HashSet<RegionId> = HashSet::default();
-    for (member_ids, _) in &components {
-        let candidate = member_ids
-            .iter()
-            .copied()
-            .min()
-            .expect("a component always carries at least one member id");
+    for ((member_ids, _), &candidate) in components.iter().zip(&candidates) {
         for &rid in member_ids {
             if rid != candidate {
                 absorbed.insert(rid);
@@ -68,12 +76,7 @@ pub fn region_tracking_system(
     // comes from this explicit assignment.
     let mut claimed: HashSet<RegionId> = HashSet::default();
     let mut survivors: Vec<RegionId> = Vec::with_capacity(components.len());
-    for (member_ids, _) in &components {
-        let candidate = member_ids
-            .iter()
-            .copied()
-            .min()
-            .expect("a component always carries at least one member id");
+    for &candidate in &candidates {
         let survivor = if !absorbed.contains(&candidate) && claimed.insert(candidate) {
             candidate
         } else {
@@ -92,12 +95,9 @@ pub fn region_tracking_system(
     // `reparent` doubles as the drain-once ledger here and is consumed by the
     // unit re-parenting pass added in Task 3.
     let mut reparent: HashMap<RegionId, RegionId> = HashMap::default();
-    for ((member_ids, _), &survivor) in components.iter().zip(&survivors) {
-        let candidate = member_ids
-            .iter()
-            .copied()
-            .min()
-            .expect("a component always carries at least one member id");
+    for (((member_ids, _), &survivor), &candidate) in
+        components.iter().zip(&survivors).zip(&candidates)
+    {
         for &rid in member_ids {
             if rid == candidate || reparent.contains_key(&rid) {
                 continue;
