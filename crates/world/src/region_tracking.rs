@@ -31,7 +31,7 @@ pub fn region_tracking_system(
     // by each component's minimum hex makes that order reproducible and
     // independent of HashMap iteration order.
     let mut components = connected_components(&owned, &grid);
-    components.sort_by_key(|(_, hexes)| {
+    components.sort_by_cached_key(|(_, hexes)| {
         hexes
             .iter()
             .map(|h| (h.x, h.y))
@@ -267,6 +267,56 @@ mod tests {
             "the split piece rebuilds its own economy"
         );
         assert_eq!(split.melanin, 0.0);
+    }
+
+    #[test]
+    fn merge_and_split_of_same_region_in_one_tick() {
+        let mut app = test_app();
+        let a = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+        let b = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+        assert!(a.0 < b.0, "A must be older so it survives the merge");
+        app.world_mut()
+            .resource_mut::<RegionStates>()
+            .get_mut(a)
+            .unwrap()
+            .sugars = 20.0;
+        {
+            let mut rs = app.world_mut().resource_mut::<RegionStates>();
+            let bs = rs.get_mut(b).unwrap();
+            bs.sugars = 15.0;
+            bs.melanin = 7.0;
+        }
+
+        // Merge component: an A tile bridged to a B tile — B is a non-minimum
+        // member here, so it lands in `absorbed`.
+        spawn_tile(&mut app, Hex::new(0, 0), Some(a), 1.0);
+        spawn_tile(&mut app, Hex::new(1, 0), Some(b), 1.0);
+        // Severed cluster still tagged B, disconnected from the merge component.
+        spawn_tile(&mut app, Hex::new(8, 0), Some(b), 1.0);
+        spawn_tile(&mut app, Hex::new(9, 0), Some(b), 1.0);
+        app.update();
+
+        let rs = app.world().resource::<RegionStates>();
+        assert!(rs.get(b).is_none(), "B is absorbed and must not survive");
+        let survivor = rs.get(a).unwrap();
+        assert_eq!(survivor.tile_count, 2, "A keeps the merge component");
+        assert_eq!(survivor.sugars, 35.0, "B's sugars fold into A exactly once");
+        assert_eq!(
+            survivor.melanin, 7.0,
+            "B's melanin folds into A exactly once"
+        );
+
+        assert_eq!(rs.regions.len(), 2);
+        let fresh = rs.regions.values().find(|s| s.region_id != a).unwrap();
+        assert_eq!(fresh.tile_count, 2, "the severed cluster is its own region");
+        assert_eq!(fresh.sugars, 0.0, "the severed cluster starts empty");
+        assert_eq!(fresh.melanin, 0.0);
     }
 
     #[test]
