@@ -283,12 +283,15 @@ pub fn update_unit_panel(
         .and_then(|e| units.get(e).ok())
         .filter(|(u, _, m)| u.kind == kingdom_core::UnitKind::Founder && m.path.is_empty());
 
-    if let Ok(mut vis) = panel.single_mut() {
-        *vis = if founder.is_some() {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+    let desired = if founder.is_some() {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if let Ok(mut vis) = panel.single_mut()
+        && *vis != desired
+    {
+        *vis = desired;
     }
     let Some((_, gpos, _)) = founder else {
         return;

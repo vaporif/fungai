@@ -13,16 +13,18 @@ pub fn is_valid_site(hex: Hex, grid: &GridWorld, tiles: &Query<&mut Tile>) -> bo
     let Some(tile) = grid.tiles.get(&hex).and_then(|&e| tiles.get(e).ok()) else {
         return false;
     };
-    // `TerrainType::is_passable()` (crates/core/src/tile.rs:18) is the single
-    // shared definition of passable, so founding and pathfinding agree.
+    // `TerrainType::is_passable()` is the single shared definition of passable,
+    // so founding and pathfinding agree.
     if !tile.terrain.is_passable() || tile.region_id.is_some() {
         return false;
     }
-    // No owned tile of any region may sit within MIN_FOUNDING_DISTANCE.
-    for (&pos, &entity) in &grid.tiles {
-        if let Ok(t) = tiles.get(entity)
+    // No owned tile of any region may sit strictly within MIN_FOUNDING_DISTANCE.
+    // Scanning only the hex disc keeps this independent of map size — `hex`
+    // itself is in the disc but is already known unclaimed, so it can't reject.
+    for pos in hex.range(MIN_FOUNDING_DISTANCE - 1) {
+        if let Some(&entity) = grid.tiles.get(&pos)
+            && let Ok(t) = tiles.get(entity)
             && t.is_owned()
-            && hex.unsigned_distance_to(pos) < MIN_FOUNDING_DISTANCE
         {
             return false;
         }

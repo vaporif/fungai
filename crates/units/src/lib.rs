@@ -40,6 +40,10 @@ impl Plugin for UnitsPlugin {
 
         app.init_resource::<kingdom_core::FoundNetworkRequest>()
             .add_message::<kingdom_core::NetworkFounded>()
+            // Runs every frame, ungated by `SimulationSystems`. The request
+            // flag is consumed once per frame: a press with no valid founder
+            // selected is simply dropped, and 1-frame ordering jitter against
+            // the input/HUD writers is harmless.
             .add_systems(Update, founding_system);
     }
 }
