@@ -353,7 +353,7 @@ Expected: PASS — the merge / split / empty tests are all green.
 
 Run: `git add -A && git commit -m "world: deterministic region merge and split"`
 
-- [ ] **Step 6: Keep the start region's explicit sugars in `terrain_gen`**
+- [x] **Step 6: Keep the start region's explicit sugars in `terrain_gen`**
 
 `init_player_region` (`crates/world/src/terrain_gen.rs:202-208`) is unchanged in shape, and its explicit `state.sugars = 100.0` stays — `RegionState::new`'s default is irrelevant since every `create_region()` caller sets its own starting resources. Confirm `init_player_region` still sets `sugars` explicitly:
 
@@ -369,7 +369,7 @@ fn init_player_region(region_states: &mut RegionStates) -> RegionId {
 
 If `init_player_region` already sets `sugars = 100.0`, this step is a no-op confirmation.
 
-- [ ] **Step 7: Write the failing test for the start region's sugars**
+- [x] **Step 7: Write the failing test for the start region's sugars**
 
 Add to the `tests` module in `crates/world/src/terrain_gen.rs`:
 
@@ -387,12 +387,12 @@ fn start_region_starts_with_full_sugars() {
 }
 ```
 
-- [ ] **Step 8: Run the test to verify it passes**
+- [x] **Step 8: Run the test to verify it passes**
 
 Run: `cargo nextest run -p kingdom_world terrain`
 Expected: PASS — the start region begins with 100 sugars set explicitly.
 
-- [ ] **Step 9: Show the network count in the HUD**
+- [x] **Step 9: Show the network count in the HUD**
 
 In `crates/ui/src/hud.rs`, change the turn-text format (`update_hud`, lines 159-170) to include the network count:
 
@@ -414,12 +414,12 @@ In `crates/ui/src/hud.rs`, change the turn-text format (`update_hud`, lines 159-
 
 `region_states` is already a field of `HudInputs` (`crates/ui/src/hud.rs:140`).
 
-- [ ] **Step 10: Verify the build and lint pass**
+- [x] **Step 10: Verify the build and lint pass**
 
 Run: `just lint && cargo nextest run -p kingdom_world -p kingdom_ui`
 Expected: PASS — format, clippy, and all touched-crate tests clean.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 Run: `git add -A && git commit -m "world+ui: deterministic region tracking, HUD network count"`
 

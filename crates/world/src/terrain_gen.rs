@@ -392,6 +392,18 @@ mod tests {
     }
 
     #[test]
+    fn start_region_starts_with_full_sugars() {
+        let mut app = test_app();
+        app.add_systems(Startup, terrain_generation);
+        app.update();
+
+        let rs = app.world().resource::<RegionStates>();
+        assert_eq!(rs.regions.len(), 1);
+        let state = rs.regions.values().next().unwrap();
+        assert_eq!(state.sugars, 100.0);
+    }
+
+    #[test]
     fn fragment_tiles_preserve_rng_nutrient_and_moisture() {
         let mut app = test_app();
         app.add_systems(Startup, terrain_generation);

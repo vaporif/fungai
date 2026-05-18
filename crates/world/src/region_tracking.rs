@@ -257,9 +257,15 @@ mod tests {
         let rs = app.world().resource::<RegionStates>();
         assert_eq!(rs.regions.len(), 2);
         let kept = rs.get(rid).unwrap();
-        assert_eq!(kept.sugars, 50.0, "the id-keeping component keeps its resources");
+        assert_eq!(
+            kept.sugars, 50.0,
+            "the id-keeping component keeps its resources"
+        );
         let split = rs.regions.values().find(|s| s.region_id != rid).unwrap();
-        assert_eq!(split.sugars, 0.0, "the split piece rebuilds its own economy");
+        assert_eq!(
+            split.sugars, 0.0,
+            "the split piece rebuilds its own economy"
+        );
         assert_eq!(split.melanin, 0.0);
     }
 
