@@ -81,7 +81,7 @@ Every `create_region()` caller sets its own starting resources explicitly — `i
 
 `Unit` re-parenting on merge is a fifth responsibility of `region_tracking_system`, but `Unit` does not exist until Task 3. Task 1 builds the merge/split skeleton; Task 3 folds the `&mut Unit` query and re-parenting into the same system once the component is available.
 
-- [ ] **Step 1: Write the failing test for deterministic merge and split**
+- [x] **Step 1: Write the failing test for deterministic merge and split**
 
 Replace the `tests` module in `crates/world/src/region_tracking.rs`. Keep the existing `test_app` / `spawn_tile` helpers but extend `spawn_tile` to accept an explicit biomass, and add merge/split tests (unit re-parenting is tested in Task 3, once `Unit` exists):
 
@@ -164,12 +164,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cargo nextest run -p kingdom_world region`
 Expected: FAIL — the old tracker does not merge by lowest id, does not split deterministically, and does not re-parent units.
 
-- [ ] **Step 3: Rewrite `region_tracking_system`**
+- [x] **Step 3: Rewrite `region_tracking_system`**
 
 Replace the whole non-test body of `crates/world/src/region_tracking.rs` with the following. Task 3 later adds the `&mut Unit` query and a re-parenting pass to this same system, once `Unit` exists.
 
@@ -344,12 +344,12 @@ Edge case worth tracing: if a region R2 is absorbed by a merge *and* also has a 
 
 Note: this uses `let`-chains (stable in edition 2024 / current nightly — the toolchain here is nightly).
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `cargo nextest run -p kingdom_world region`
 Expected: PASS — the merge / split / empty tests are all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run: `git add -A && git commit -m "world: deterministic region merge and split"`
 

@@ -9,50 +9,120 @@ pub fn region_tracking_system(
     grid: Res<GridWorld>,
     mut region_states: ResMut<RegionStates>,
 ) {
-    // THRESHOLD-GATED: a tile is "owned" only when its biomass has actually
-    // reached CLAIM_THRESHOLD. Sub-threshold region_id tags (e.g. fresh density
-    // flow that hasn't accumulated yet) do not contribute to region tracking.
-    let player_tiles: HashMap<Hex, RegionId> = tiles
-        .iter()
-        .filter(|(_, tile)| tile.is_owned())
-        .filter_map(|(gpos, tile)| tile.region_id.map(|rid| (gpos.0, rid)))
-        .collect();
+    // Pass 1 — read-only snapshot of owned tiles and their biomass.
+    let mut owned: HashMap<Hex, RegionId> = HashMap::default();
+    let mut biomass: HashMap<Hex, f32> = HashMap::default();
+    for (gpos, tile) in tiles.iter() {
+        if tile.is_owned()
+            && let Some(rid) = tile.region_id
+        {
+            owned.insert(gpos.0, rid);
+            biomass.insert(gpos.0, tile.biomass);
+        }
+    }
 
     for state in region_states.regions.values_mut() {
         state.tile_count = 0;
         state.total_biomass = 0.0;
     }
 
-    let components = connected_components(&player_tiles, &grid);
-
-    // First connected component keeps the original id, splits get new ones
-    let mut seen_rids: HashSet<RegionId> = HashSet::default();
-    for (original_rid, positions) in &components {
-        let rid = if seen_rids.insert(*original_rid) {
-            *original_rid
-        } else {
-            region_states.create_region()
-        };
-
-        let biomass_sum: f32 = positions
+    // Sort components deterministically before processing: split pieces call
+    // create_region(), so the iteration order fixes the new region ids. Sorting
+    // by each component's minimum hex makes that order reproducible and
+    // independent of HashMap iteration order.
+    let mut components = connected_components(&owned, &grid);
+    components.sort_by_key(|(_, hexes)| {
+        hexes
             .iter()
-            .filter_map(|p| grid.tiles.get(p))
-            .filter_map(|&e| tiles.get(e).ok())
-            .map(|(_, t)| t.biomass)
-            .sum();
+            .map(|h| (h.x, h.y))
+            .min()
+            .expect("component is never empty")
+    });
 
-        if let Some(state) = region_states.get_mut(rid) {
-            state.tile_count = positions.len() as u32;
+    // An id is "absorbed" if it appears as a non-minimum member of any
+    // component — a merge swallows it there, so it must not survive anywhere.
+    // Every other piece still carrying that id becomes a fresh region instead
+    // of keeping it. Computing this set up front (rather than deciding per
+    // component) is what makes a simultaneous merge-and-split of the same
+    // region deterministic instead of corrupting its id.
+    let mut absorbed: HashSet<RegionId> = HashSet::default();
+    for (member_ids, _) in &components {
+        let candidate = member_ids
+            .iter()
+            .copied()
+            .min()
+            .expect("a component always carries at least one member id");
+        for &rid in member_ids {
+            if rid != candidate {
+                absorbed.insert(rid);
+            }
+        }
+    }
+
+    // Pass 2 — assign each component its survivor id, in the sorted order. The
+    // first component to want an un-absorbed `candidate` keeps it. A later
+    // component with the same candidate is a split; so is any component whose
+    // candidate is absorbed elsewhere. Both get a fresh region with an empty
+    // bank — RegionState::new's default is a don't-care, the empty economy
+    // comes from this explicit assignment.
+    let mut claimed: HashSet<RegionId> = HashSet::default();
+    let mut survivors: Vec<RegionId> = Vec::with_capacity(components.len());
+    for (member_ids, _) in &components {
+        let candidate = member_ids
+            .iter()
+            .copied()
+            .min()
+            .expect("a component always carries at least one member id");
+        let survivor = if !absorbed.contains(&candidate) && claimed.insert(candidate) {
+            candidate
+        } else {
+            let fresh = region_states.create_region();
+            if let Some(state) = region_states.get_mut(fresh) {
+                state.sugars = 0.0;
+                state.melanin = 0.0;
+            }
+            fresh
+        };
+        survivors.push(survivor);
+    }
+
+    // Pass 3 — fold each absorbed region's resources into the survivor of the
+    // first component (in sorted order) that merges it, then remove it.
+    // `reparent` doubles as the drain-once ledger here and is consumed by the
+    // unit re-parenting pass added in Task 3.
+    let mut reparent: HashMap<RegionId, RegionId> = HashMap::default();
+    for ((member_ids, _), &survivor) in components.iter().zip(&survivors) {
+        let candidate = member_ids
+            .iter()
+            .copied()
+            .min()
+            .expect("a component always carries at least one member id");
+        for &rid in member_ids {
+            if rid == candidate || reparent.contains_key(&rid) {
+                continue;
+            }
+            if let Some(state) = region_states.remove(rid)
+                && let Some(survivor_state) = region_states.get_mut(survivor)
+            {
+                survivor_state.sugars += state.sugars;
+                survivor_state.melanin += state.melanin;
+            }
+            reparent.insert(rid, survivor);
+        }
+    }
+
+    // Pass 4 — relabel every tile to its component's survivor and tally it.
+    for ((_, hexes), &survivor) in components.iter().zip(&survivors) {
+        let biomass_sum: f32 = hexes.iter().filter_map(|h| biomass.get(h)).sum();
+        if let Some(state) = region_states.get_mut(survivor) {
+            state.tile_count = hexes.len() as u32;
             state.total_biomass = biomass_sum;
         }
-
-        if rid != *original_rid {
-            for &pos in positions {
-                if let Some(&entity) = grid.tiles.get(&pos)
-                    && let Ok((_, mut tile)) = tiles.get_mut(entity)
-                {
-                    tile.region_id = Some(rid);
-                }
+        for &pos in hexes {
+            if let Some(&entity) = grid.tiles.get(&pos)
+                && let Ok((_, mut tile)) = tiles.get_mut(entity)
+            {
+                tile.region_id = Some(survivor);
             }
         }
     }
@@ -61,31 +131,35 @@ pub fn region_tracking_system(
 }
 
 fn connected_components(
-    player_tiles: &HashMap<Hex, RegionId>,
+    owned: &HashMap<Hex, RegionId>,
     grid: &GridWorld,
-) -> Vec<(RegionId, Vec<Hex>)> {
+) -> Vec<(HashSet<RegionId>, Vec<Hex>)> {
     let mut visited: HashSet<Hex> = HashSet::default();
     let mut components = Vec::new();
 
-    for (&start, &original_rid) in player_tiles {
+    for &start in owned.keys() {
         if visited.contains(&start) {
             continue;
         }
         let mut component = Vec::new();
+        let mut member_ids = HashSet::default();
         let mut stack = vec![start];
         while let Some(p) = stack.pop() {
             if !visited.insert(p) {
                 continue;
             }
             component.push(p);
+            if let Some(&rid) = owned.get(&p) {
+                member_ids.insert(rid);
+            }
             for (neighbor, _) in grid.neighbors(p) {
-                if !visited.contains(&neighbor) && player_tiles.contains_key(&neighbor) {
+                if !visited.contains(&neighbor) && owned.contains_key(&neighbor) {
                     stack.push(neighbor);
                 }
             }
         }
         if !component.is_empty() {
-            components.push((original_rid, component));
+            components.push((member_ids, component));
         }
     }
     components
@@ -100,13 +174,11 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<GridWorld>();
         app.init_resource::<RegionStates>();
+        app.add_systems(Update, region_tracking_system);
         app
     }
 
-    fn spawn_tile(app: &mut App, pos: Hex, region_id: Option<RegionId>) -> Entity {
-        // For tracking tests, owned tiles need biomass >= CLAIM_THRESHOLD to
-        // satisfy the THRESHOLD-GATED ownership semantics.
-        let biomass = if region_id.is_some() { 0.5 } else { 0.0 };
+    fn spawn_tile(app: &mut App, pos: Hex, region_id: Option<RegionId>, biomass: f32) -> Entity {
         let entity = app
             .world_mut()
             .spawn((
@@ -126,47 +198,80 @@ mod tests {
     }
 
     #[test]
-    fn connected_player_tiles_form_one_region() {
+    fn contiguous_regions_merge_to_lowest_id() {
         let mut app = test_app();
-        let rid = app
+        let old = app
             .world_mut()
             .resource_mut::<RegionStates>()
             .create_region();
+        let young = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+        assert!(old.0 < young.0);
+        app.world_mut()
+            .resource_mut::<RegionStates>()
+            .get_mut(old)
+            .unwrap()
+            .sugars = 30.0;
+        app.world_mut()
+            .resource_mut::<RegionStates>()
+            .get_mut(young)
+            .unwrap()
+            .sugars = 12.0;
 
-        // Three horizontally adjacent hexes (axial coords: q varies, r=0)
-        spawn_tile(&mut app, Hex::new(0, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(1, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(2, 0), Some(rid));
-
-        app.add_systems(Update, region_tracking_system);
+        // Three adjacent tiles bridge the two regions into one component.
+        spawn_tile(&mut app, Hex::new(0, 0), Some(old), 1.0);
+        spawn_tile(&mut app, Hex::new(1, 0), Some(young), 1.0);
+        spawn_tile(&mut app, Hex::new(2, 0), Some(young), 1.0);
         app.update();
 
-        let regions = app.world().resource::<RegionStates>();
-        let state = regions.get(rid).unwrap();
-        assert_eq!(state.tile_count, 3);
+        let rs = app.world().resource::<RegionStates>();
+        assert!(rs.get(young).is_none(), "younger region should be absorbed");
+        let survivor = rs.get(old).unwrap();
+        assert_eq!(survivor.tile_count, 3);
+        assert_eq!(survivor.sugars, 42.0, "absorbed sugars pool into survivor");
     }
 
     #[test]
-    fn disconnected_tiles_split_into_two_regions() {
+    fn severed_split_piece_gets_a_fresh_empty_region() {
         let mut app = test_app();
         let rid = app
             .world_mut()
             .resource_mut::<RegionStates>()
             .create_region();
+        app.world_mut()
+            .resource_mut::<RegionStates>()
+            .get_mut(rid)
+            .unwrap()
+            .sugars = 50.0;
 
-        // Two clusters separated by a gap (non-adjacent in hex space)
-        spawn_tile(&mut app, Hex::new(0, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(1, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(2, 0), None);
-        spawn_tile(&mut app, Hex::new(3, 0), Some(rid));
-        spawn_tile(&mut app, Hex::new(4, 0), Some(rid));
-
-        app.add_systems(Update, region_tracking_system);
+        // Two clusters, no connecting tile. They share `rid` as their min member id,
+        // so one keeps it (the cluster sorting first by lowest hex) and the other splits.
+        spawn_tile(&mut app, Hex::new(0, 0), Some(rid), 1.0);
+        spawn_tile(&mut app, Hex::new(1, 0), Some(rid), 1.0);
+        spawn_tile(&mut app, Hex::new(5, 0), Some(rid), 0.4);
+        spawn_tile(&mut app, Hex::new(6, 0), Some(rid), 0.9);
         app.update();
 
-        let regions = app.world().resource::<RegionStates>();
-        let total_player_tiles: u32 = regions.regions.values().map(|r| r.tile_count).sum();
-        assert_eq!(total_player_tiles, 4);
-        assert!(regions.regions.len() >= 2);
+        let rs = app.world().resource::<RegionStates>();
+        assert_eq!(rs.regions.len(), 2);
+        let kept = rs.get(rid).unwrap();
+        assert_eq!(kept.sugars, 50.0, "the id-keeping component keeps its resources");
+        let split = rs.regions.values().find(|s| s.region_id != rid).unwrap();
+        assert_eq!(split.sugars, 0.0, "the split piece rebuilds its own economy");
+        assert_eq!(split.melanin, 0.0);
+    }
+
+    #[test]
+    fn empty_region_is_removed() {
+        let mut app = test_app();
+        let rid = app
+            .world_mut()
+            .resource_mut::<RegionStates>()
+            .create_region();
+        spawn_tile(&mut app, Hex::new(0, 0), Some(rid), 0.05);
+        app.update();
+        assert!(app.world().resource::<RegionStates>().get(rid).is_none());
     }
 }
