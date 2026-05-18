@@ -64,14 +64,17 @@ pub fn terrain_generation(
     let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
     let player_hexes: HashSet<Hex> = player_start.range(2).collect();
 
+    // Hives are separate entities, not tile contents, so they are not
+    // recorded in `placements.contents` — popping from a dedicated pool is
+    // enough to keep them distinct. The `contents` check only skips hexes
+    // already claimed by the other features.
+    let mut hive_pool: Vec<Hex> = soil_pool
+        .iter()
+        .copied()
+        .filter(|h| h.unsigned_distance_to(player_start) > 6)
+        .collect();
     for _ in 0..HIVE_COUNT {
-        let Some(pos) = soil_pool
-            .iter()
-            .position(|h| {
-                h.unsigned_distance_to(player_start) > 6 && !placements.contents.contains_key(h)
-            })
-            .map(|i| soil_pool.remove(i))
-        else {
+        let Some(pos) = pop_unclaimed(&mut hive_pool, &placements.contents) else {
             break;
         };
         placements.hives.push(pos);

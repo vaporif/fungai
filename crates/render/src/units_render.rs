@@ -7,6 +7,11 @@ use crate::entity_render::organism_sprite_size;
 /// Z layer for the unit-layer sprites, above terrain/network.
 const HIVE_Z: f32 = 1.5;
 
+/// Links a hive sprite to its source `Hive` entity.
+///
+/// Unlike `OrganismSpriteLink`, this has no `RemovedComponents`-based orphan
+/// cleanup: hives are placed at world-gen and never despawned in Phase 1, so
+/// the source entity always outlives the sprite.
 #[derive(Component)]
 pub struct HiveSprite(pub Entity);
 
