@@ -898,7 +898,7 @@ Captured hives spend the owner network's sugars to produce capped `Founder` unit
 - Modify: `crates/render/src/units_render.rs`, `crates/render/src/lib.rs`
 - Modify: `crates/ui/src/hud.rs`
 
-- [ ] **Step 1: Add the `Unit` components**
+- [x] **Step 1: Add the `Unit` components**
 
 Append to `crates/core/src/components.rs`:
 
@@ -928,7 +928,7 @@ pub struct UnitMovement {
 
 `Hex` and `RegionId` are already imported at the top of `components.rs`.
 
-- [ ] **Step 2: Add the production/upkeep/cap constants**
+- [x] **Step 2: Add the production/upkeep/cap constants**
 
 Append to `crates/core/src/constants.rs`:
 
@@ -940,12 +940,12 @@ pub const UNIT_CAP_BASE: u32 = 2;
 pub const UNIT_CAP_PER_HIVE: u32 = 2;
 ```
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `cargo build -p kingdom_core`
 Expected: PASS.
 
-- [ ] **Step 4: Write the failing tests for production and upkeep**
+- [x] **Step 4: Write the failing tests for production and upkeep**
 
 Create `crates/units/src/production.rs` with the test module first:
 
@@ -984,8 +984,9 @@ mod tests {
         let mut app = test_app();
         let rid = app.world_mut().resource_mut::<RegionStates>().create_region();
         app.world_mut().resource_mut::<RegionStates>().get_mut(rid).unwrap().sugars = 100.0;
-        // No captured hives → cap is UNIT_CAP_BASE (2). Pre-spawn 2 units.
-        for _ in 0..2 {
+        // One captured hive → cap is UNIT_CAP_BASE + 1 * UNIT_CAP_PER_HIVE = 4.
+        // Pre-spawn 4 units so the hive starts already at the cap.
+        for _ in 0..4 {
             app.world_mut().spawn((
                 GridPos(hexx::Hex::new(9, 9)),
                 Unit { kind: UnitKind::Founder, owner: rid },
@@ -998,10 +999,10 @@ mod tests {
         let sugars_before = app.world().resource::<RegionStates>().get(rid).unwrap().sugars;
         app.update();
         let founders = app.world_mut().query::<&Unit>().iter(app.world()).count();
-        assert_eq!(founders, 2, "no founder spawned beyond the cap");
-        // Production drained no sugars while capped, but upkeep on the 2 units does.
+        assert_eq!(founders, 4, "no founder spawned beyond the cap");
+        // Production drained no sugars while capped; only upkeep on the 4 units does.
         let drained = sugars_before - app.world().resource::<RegionStates>().get(rid).unwrap().sugars;
-        assert!((drained - 0.2).abs() < 1e-4, "only upkeep drained, not production");
+        assert!((drained - 0.4).abs() < 1e-4, "only upkeep drained, not production");
     }
 
     #[test]
@@ -1019,12 +1020,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they fail**
+- [x] **Step 5: Run the tests to verify they fail**
 
 Run: `cargo nextest run -p kingdom_units production`
 Expected: FAIL — `hive_production_system` / `unit_upkeep_system` undefined.
 
-- [ ] **Step 6: Implement production and upkeep**
+- [x] **Step 6: Implement production and upkeep**
 
 Prepend to `crates/units/src/production.rs`:
 
@@ -1088,7 +1089,7 @@ iteration order. Correctness (no overshoot) holds regardless via the `living`
 running total. If a future change needs the winner to be reproducible, collect
 hives into a `Vec` sorted by `gpos.0` `(x, y)` before the loop.
 
-- [ ] **Step 7: Register production in the plugin**
+- [x] **Step 7: Register production in the plugin**
 
 In `crates/units/src/lib.rs`, add `mod production;`, re-export `pub use production::{hive_production_system, unit_upkeep_system};`, and extend the `SimulationSystems` chain so capture → production → upkeep run in order:
 
@@ -1102,12 +1103,12 @@ In `crates/units/src/lib.rs`, add `mod production;`, re-export `pub use producti
         );
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cargo nextest run -p kingdom_units production`
 Expected: PASS — all three production/cap/upkeep tests green.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run: `git add -A && git commit -m "units: founder production, unit cap, upkeep"`
 
