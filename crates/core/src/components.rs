@@ -74,7 +74,6 @@ pub struct SelectedRegion {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum UnitKind {
-    /// Phase 1 ships only this variant; Scout/Soldier/Builder arrive later.
     Founder,
 }
 

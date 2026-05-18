@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use kingdom_core::{
-    GridPos, HIVE_PRODUCTION_RATE, HIVE_PRODUCTION_SUGAR_COST, Hive, RegionStates, UNIT_CAP_BASE,
-    UNIT_CAP_PER_HIVE, UNIT_UPKEEP_SUGAR, Unit, UnitKind, UnitMovement,
+    GridPos, Hive, RegionStates, Unit, UnitKind, UnitMovement, HIVE_PRODUCTION_RATE,
+    HIVE_PRODUCTION_SUGAR_COST, UNIT_CAP_BASE, UNIT_CAP_PER_HIVE, UNIT_UPKEEP_SUGAR,
 };
 
 pub fn hive_production_system(
@@ -14,7 +14,7 @@ pub fn hive_production_system(
         .iter()
         .filter(|(_, h)| h.captured_by.is_some())
         .count() as u32;
-    // Phase 1: a single global unit cap/pool; per-network caps come later.
+    // The cap is global across all the player's networks.
     let cap = UNIT_CAP_BASE + captured_hives * UNIT_CAP_PER_HIVE;
     let mut living = units.iter().count() as u32;
 
@@ -53,7 +53,7 @@ pub fn unit_upkeep_system(units: Query<&Unit>, mut region_states: ResMut<RegionS
         if let Some(state) = region_states.get_mut(unit.owner) {
             state.sugars = (state.sugars - UNIT_UPKEEP_SUGAR).max(0.0);
         }
-        // A unit whose owner region no longer exists is skipped (Phase 1).
+        // A unit whose owner region no longer exists pays no upkeep.
     }
 }
 
