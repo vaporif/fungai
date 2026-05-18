@@ -71,7 +71,6 @@ pub fn spawn_hud(mut commands: Commands) {
             ));
         });
 
-    // Speed display (bottom-right)
     commands.spawn((
         SpeedDisplayText,
         Text::new(SimulationSpeed::default().label()),
@@ -254,12 +253,10 @@ pub fn update_hud(inputs: HudInputs, mut texts: HudTexts) {
         }
     }
 
-    // Update speed display
     if let Ok(mut text) = texts.speed.single_mut() {
         **text = speed.label().into();
     }
 
-    // Toggle hints on H key
     if keyboard.just_pressed(KeyCode::KeyH) {
         hints_visible.0 = !hints_visible.0;
     }

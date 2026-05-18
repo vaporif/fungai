@@ -92,8 +92,8 @@ pub fn region_tracking_system(
 
     // Pass 3 — fold each absorbed region's resources into the survivor of the
     // first component (in sorted order) that merges it, then remove it.
-    // `reparent` doubles as the drain-once ledger here and is consumed by the
-    // unit re-parenting pass added in Task 3.
+    // `reparent` doubles as the drain-once ledger and feeds the unit
+    // re-parenting pass below.
     let mut reparent: HashMap<RegionId, RegionId> = HashMap::default();
     for (((member_ids, _), &survivor), &candidate) in
         components.iter().zip(&survivors).zip(&candidates)
