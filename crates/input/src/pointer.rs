@@ -14,7 +14,7 @@ use crate::camera::GameCamera;
 use crate::wisp::TileTapped;
 
 /// First unit entity occupying `hex`, if any.
-pub fn unit_at<'a>(
+fn unit_at<'a>(
     hex: Hex,
     units: impl Iterator<Item = (Entity, &'a GridPos, &'a Unit)>,
 ) -> Option<Entity> {

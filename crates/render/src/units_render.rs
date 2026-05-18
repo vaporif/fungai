@@ -119,6 +119,16 @@ pub fn despawn_unit_sprites(
 
 const SELECTION_RING_Z: f32 = 2.4;
 
+/// World position of a unit mid-stride: hex-centre to hex-centre, interpolated
+/// by `edge_progress`. Idle units (empty path) sit on their `GridPos`.
+fn interpolated_world_pos(layout: &HexLayout, gpos: &GridPos, movement: &UnitMovement) -> Vec2 {
+    let from = layout.hex_to_world_pos(gpos.0);
+    match movement.path.first() {
+        Some(&next) => from.lerp(layout.hex_to_world_pos(next), movement.edge_progress),
+        None => from,
+    }
+}
+
 /// Per-frame: place each unit sprite by interpolating between its `GridPos`
 /// and the next path hex by `edge_progress`. The small unit sprite physically
 /// travels hex-centre to hex-centre, visibly crossing each hex it traverses.
@@ -131,11 +141,7 @@ pub fn unit_position_system(
         let Ok((gpos, movement)) = units.get(link.0) else {
             continue;
         };
-        let from = layout.hex_to_world_pos(gpos.0);
-        let world = match movement.path.first() {
-            Some(&next) => from.lerp(layout.hex_to_world_pos(next), movement.edge_progress),
-            None => from,
-        };
+        let world = interpolated_world_pos(&layout, gpos, movement);
         transform.translation = world.extend(UNIT_Z);
     }
 }
@@ -155,11 +161,7 @@ pub fn selection_ring_system(
     match (target, rings.iter().next()) {
         (None, Some(ring)) => commands.entity(ring).despawn(),
         (Some((gpos, movement)), existing) => {
-            let from = layout.hex_to_world_pos(gpos.0);
-            let world = match movement.path.first() {
-                Some(&next) => from.lerp(layout.hex_to_world_pos(next), movement.edge_progress),
-                None => from,
-            };
+            let world = interpolated_world_pos(&layout, gpos, movement);
             // Ring hugs the small unit body, not the hex.
             let size = organism_sprite_size(&layout) * UNIT_SPRITE_FRACTION * 1.6;
             let ring = existing.unwrap_or_else(|| commands.spawn(SelectionRing).id());
