@@ -3,8 +3,9 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use hexx::{Hex, HexOrientation, OffsetHexMode};
 use kingdom_core::{
-    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, LaunchConfig,
-    NeutralFungusAgent, PlantRootAgent, RegionId, RegionStates, TerrainType, Tile, TileContents,
+    BacteriaColonyAgent, FragmentAgent, FragmentId, GameState, GridPos, GridWorld, HIVE_COUNT,
+    Hive, LaunchConfig, NeutralFungusAgent, PlantRootAgent, RegionId, RegionStates, TerrainType,
+    Tile, TileContents,
 };
 use rand::prelude::*;
 use rand::rngs::StdRng;
@@ -41,6 +42,7 @@ struct Placements {
     fungi: Vec<(Hex, u32)>,
     plants: Vec<(Hex, u32)>,
     bacteria: Vec<Hex>,
+    hives: Vec<Hex>,
 }
 
 pub fn terrain_generation(
@@ -61,6 +63,22 @@ pub fn terrain_generation(
     let player_rid = init_player_region(&mut region_states);
     let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
     let player_hexes: HashSet<Hex> = player_start.range(2).collect();
+
+    // Hives are separate entities, not tile contents, so they are not
+    // recorded in `placements.contents` — popping from a dedicated pool is
+    // enough to keep them distinct. The `contents` check only skips hexes
+    // already claimed by the other features.
+    let mut hive_pool: Vec<Hex> = soil_pool
+        .iter()
+        .copied()
+        .filter(|h| h.unsigned_distance_to(player_start) > 6)
+        .collect();
+    for _ in 0..HIVE_COUNT {
+        let Some(pos) = pop_unclaimed(&mut hive_pool, &placements.contents) else {
+            break;
+        };
+        placements.hives.push(pos);
+    }
 
     let mut tile_buf = build_tile_buffer(&tile_data, &mut placements, player_rid, &player_hexes);
     seed_radiation(&mut tile_buf, &mut rng);
@@ -318,6 +336,15 @@ fn spawn_agents(commands: &mut Commands, p: Placements) {
             },
         ));
     }
+    for pos in p.hives {
+        commands.spawn((
+            GridPos(pos),
+            Hive {
+                captured_by: None,
+                production: 0.0,
+            },
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -389,6 +416,38 @@ mod tests {
         let surface_tile = app.world().get::<Tile>(grid.tiles[&near_surface]).unwrap();
         let deep_tile = app.world().get::<Tile>(grid.tiles[&deep]).unwrap();
         assert!(surface_tile.moisture > deep_tile.moisture);
+    }
+
+    #[test]
+    fn start_region_starts_with_full_sugars() {
+        let mut app = test_app();
+        app.add_systems(Startup, terrain_generation);
+        app.update();
+
+        let rs = app.world().resource::<RegionStates>();
+        assert_eq!(rs.regions.len(), 1);
+        let state = rs.regions.values().next().unwrap();
+        assert_eq!(state.sugars, 100.0);
+    }
+
+    #[test]
+    fn places_hives_clear_of_player_start() {
+        use kingdom_core::Hive;
+        let mut app = test_app();
+        app.add_systems(Startup, terrain_generation);
+        app.update();
+
+        let player_start = offset_to_hex(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+        let mut hive_count = 0;
+        let mut q = app.world_mut().query::<(&GridPos, &Hive)>();
+        for (gpos, _) in q.iter(app.world()) {
+            hive_count += 1;
+            assert!(
+                gpos.0.unsigned_distance_to(player_start) > 6,
+                "hive too close to start"
+            );
+        }
+        assert!(hive_count > 0 && hive_count <= HIVE_COUNT as i32);
     }
 
     #[test]

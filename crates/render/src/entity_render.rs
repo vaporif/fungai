@@ -3,9 +3,9 @@ use std::collections::{HashMap, HashSet};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use kingdom_core::{
-    FaunaAgent, FragmentAgent, FruitingBody, GridPos, Hex, HexLayout, MushroomEntity,
-    NeutralFungusAgent, OrganismSpriteLink, PlantRootAgent, Tile, BIAS_GLOW_VISIBLE_THRESHOLD,
-    BIAS_MAGNITUDE_CAP,
+    BIAS_GLOW_VISIBLE_THRESHOLD, BIAS_MAGNITUDE_CAP, FaunaAgent, FragmentAgent, FruitingBody,
+    GridPos, Hex, HexLayout, MushroomEntity, NeutralFungusAgent, OrganismSpriteLink,
+    PlantRootAgent, Tile,
 };
 
 use crate::assets::EntitySprites;
@@ -349,7 +349,7 @@ mod tests {
 mod glow_diff_tests {
     use super::*;
     use bevy::MinimalPlugins;
-    use kingdom_core::{create_hex_layout, GridPos, Tile, BIAS_GLOW_VISIBLE_THRESHOLD};
+    use kingdom_core::{BIAS_GLOW_VISIBLE_THRESHOLD, GridPos, Tile, create_hex_layout};
 
     fn test_app() -> App {
         let mut app = App::new();

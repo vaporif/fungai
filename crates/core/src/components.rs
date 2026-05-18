@@ -58,8 +58,44 @@ pub struct MushroomEntity {
 #[derive(Component, Debug)]
 pub struct OrganismSpriteLink(pub Entity);
 
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct Hive {
+    /// `None` = neutral; `Some` = the owning network.
+    pub captured_by: Option<RegionId>,
+    /// 0.0..=1.0 progress toward the next founder.
+    pub production: f32,
+}
+
 #[derive(Resource, Default)]
 pub struct SelectedRegion {
     pub region_id: Option<RegionId>,
     pub selected_pos: Option<Hex>,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
+pub enum UnitKind {
+    Founder,
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct Unit {
+    pub kind: UnitKind,
+    /// The network that produced the unit; pays its upkeep.
+    pub owner: RegionId,
+}
+
+#[derive(Component, Clone, Debug, Reflect, Default)]
+pub struct UnitMovement {
+    /// Remaining hexes to traverse, in order; empty = idle.
+    #[reflect(ignore)]
+    pub path: Vec<Hex>,
+    /// 0.0..1.0 progress along the edge from `GridPos` to `path[0]`.
+    pub edge_progress: f32,
+}
+
+#[derive(Resource, Default)]
+pub struct SelectedUnit(pub Option<Entity>);
+
+/// Set for one frame to request that the selected founder found a network.
+#[derive(Resource, Default)]
+pub struct FoundNetworkRequest(pub bool);

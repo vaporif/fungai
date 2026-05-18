@@ -41,3 +41,18 @@ pub const SAMPLE_HEX_DISTANCE: f32 = 0.5;
 pub const WISP_SENSE_RADIUS_HEX: u32 = 5;
 
 pub const BIAS_GLOW_VISIBLE_THRESHOLD: f32 = 0.05;
+
+pub const HIVE_COUNT: u32 = 6;
+
+pub const HIVE_PRODUCTION_SUGAR_COST: f32 = 1.0;
+pub const HIVE_PRODUCTION_RATE: f32 = 0.05;
+pub const UNIT_UPKEEP_SUGAR: f32 = 0.1;
+pub const UNIT_CAP_BASE: u32 = 2;
+pub const UNIT_CAP_PER_HIVE: u32 = 2;
+
+pub const UNIT_SPEED_HEXES_PER_SEC: f32 = 1.0;
+
+/// Minimum hex distance from any owned tile to a valid founding site.
+pub const MIN_FOUNDING_DISTANCE: u32 = 6;
+pub const FOUNDER_SEED_BIOMASS: f32 = 1.0;
+pub const FOUNDER_SEED_SUGARS: f32 = 10.0;

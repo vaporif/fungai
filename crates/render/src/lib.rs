@@ -10,6 +10,7 @@ mod data_layer;
 mod entity_render;
 mod network_render;
 mod terrain_render;
+mod units_render;
 
 pub use data_layer::{BranchGraph, DiscoveryMap, RegionHulls};
 pub use network_render::catmull_rom;
@@ -59,6 +60,12 @@ impl Plugin for RenderPlugin {
                         .chain(),
                     entity_render::bias_glow_render_system,
                     entity_render::region_highlight_render_system,
+                    units_render::spawn_hive_sprites,
+                    units_render::hive_tint_system,
+                    units_render::spawn_unit_sprites,
+                    units_render::despawn_unit_sprites,
+                    units_render::unit_position_system,
+                    units_render::selection_ring_system,
                     atmosphere::update_vignette,
                 ),
             );
